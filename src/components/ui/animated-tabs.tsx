@@ -36,7 +36,7 @@ export default function AnimatedTabs({ tabs, activeValue, onTabChange }: Animate
   };
 
   return (
-    <div className="relative flex gap-3" style={{ fontFamily: "'Patrick Hand', cursive" }}>
+    <div className="relative flex gap-3" style={{ fontFamily: "var(--font-bricolage), sans-serif" }}>
       {/* Base Layer - Inactive Tabs */}
       <div className="flex gap-3 relative z-10 w-max">
         {tabs.map((tab, idx) => (
@@ -46,7 +46,8 @@ export default function AnimatedTabs({ tabs, activeValue, onTabChange }: Animate
               tabRefs.current[idx] = el;
             }}
             onClick={() => handleClick(tab.value)}
-            className="px-5 py-[0.3rem] text-[1.05rem] font-bold tracking-wide rounded-full border-[2.5px] border-[#222] bg-[#f5f5f5] text-[#555] hover:bg-[#eaeaea] transition-colors focus:outline-none"
+            className="px-5 py-[0.35rem] text-[0.94rem] font-bold tracking-[0.12em] border border-[#c8a64d] bg-[#10202a] text-[#d1dde2] transition-colors focus:outline-none"
+            style={{ clipPath: "polygon(10% 0, 100% 0, 90% 100%, 0 100%)" }}
           >
             {tab.label}
           </button>
@@ -65,7 +66,8 @@ export default function AnimatedTabs({ tabs, activeValue, onTabChange }: Animate
           {tabs.map((tab) => (
             <div
               key={tab.value}
-              className="px-5 py-[0.3rem] text-[1.05rem] font-bold tracking-wide rounded-full border-[2.5px] border-[#222] bg-[#222] text-[#fff] flex items-center justify-center box-border"
+              className="px-5 py-[0.35rem] text-[0.94rem] font-bold tracking-[0.12em] border border-[#d4af37] bg-linear-to-br from-[#e6c766] to-[#a88a2a] text-[#101820] flex items-center justify-center box-border"
+              style={{ clipPath: "polygon(10% 0, 100% 0, 90% 100%, 0 100%)" }}
             >
               {tab.label}
             </div>
