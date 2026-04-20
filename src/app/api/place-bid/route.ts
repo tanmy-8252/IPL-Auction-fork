@@ -15,6 +15,10 @@ type BidEventInsert = {
   bid_lakhs: number;
 };
 
+const TEAM_PURSE_CAP_LAKHS = 10000; // 100 Cr
+const TEAM_SIZE_CAP = 11;
+const BID_INCREMENT_LAKHS = 50;
+
 const getServerSupabase = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const serviceRoleKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -82,8 +86,51 @@ export async function POST(request: Request) {
 
     const activeAuctionStateRow = latestAuctionStateRow;
 
+    if (activeAuctionStateRow.status !== "bidding") {
+      return NextResponse.json(
+        { message: "Bidding has not started yet. Waiting for auctioneer." },
+        { status: 403 },
+      );
+    }
+
     if (activeAuctionStateRow.current_player_id !== payload.playerId) {
       return NextResponse.json({ message: "Live lot changed before your update." }, { status: 409 });
+    }
+
+    const { data: teamRow, error: teamReadError } = await supabase
+      .from("teams")
+      .select("franchise_code,purse_lakhs,spent_lakhs,roster_count,is_blocked")
+      .eq("franchise_code", payload.franchiseCode)
+      .maybeSingle();
+
+    if (teamReadError || !teamRow) {
+      return NextResponse.json({ message: "Team not found." }, { status: 404 });
+    }
+
+    if (teamRow.is_blocked) {
+      return NextResponse.json({ message: "Your franchise is currently blocked from bidding." }, { status: 403 });
+    }
+
+    const teamSpentLakhs = Number(teamRow.spent_lakhs ?? 0);
+    const remainingPurseLakhs = Math.max(TEAM_PURSE_CAP_LAKHS - teamSpentLakhs, 0);
+    const rosterCount = Number(teamRow.roster_count ?? 0);
+
+    if (remainingPurseLakhs <= 0) {
+      return NextResponse.json(
+        { message: "You have exhausted your funds. Go back and manage your team." },
+        { status: 403 },
+      );
+    }
+
+    if (rosterCount >= TEAM_SIZE_CAP) {
+      return NextResponse.json(
+        { message: `Squad full. Maximum ${TEAM_SIZE_CAP} players allowed.` },
+        { status: 403 },
+      );
+    }
+
+    if (payload.bidLakhs > TEAM_PURSE_CAP_LAKHS) {
+      return NextResponse.json({ message: "Bid exceeds configured team purse cap." }, { status: 400 });
     }
 
     const { data: playerRow, error: playerReadError } = await supabase
@@ -98,12 +145,19 @@ export async function POST(request: Request) {
 
     const currentBidLakhs = Number(activeAuctionStateRow.current_bid_lakhs ?? 0);
     const basePriceLakhs = Number(playerRow.base_price_lakhs ?? 0);
-    const minimumNextBidLakhs = Math.max(basePriceLakhs, currentBidLakhs + 5);
+    const minimumNextBidLakhs = Math.max(basePriceLakhs, currentBidLakhs + BID_INCREMENT_LAKHS);
 
     if (payload.bidLakhs < minimumNextBidLakhs) {
       return NextResponse.json(
         { message: `Bid too low. Minimum next bid is ${minimumNextBidLakhs} lakhs.` },
         { status: 400 },
+      );
+    }
+
+    if (payload.bidLakhs > remainingPurseLakhs) {
+      return NextResponse.json(
+        { message: "Insufficient purse for this bid." },
+        { status: 403 },
       );
     }
 

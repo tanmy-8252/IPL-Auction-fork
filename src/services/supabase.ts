@@ -21,6 +21,9 @@ export type AuctionSnapshot = {
 
 type PurseUpdateType = "increase" | "decrease";
 
+const TEAM_SIZE_CAP = 11;
+const TEAM_PURSE_CAP_LAKHS = 10000; // 100 Cr
+
 const normalizeAmount = (value: unknown): number => {
   const amount = typeof value === "number" ? value : Number(value);
   return Number.isFinite(amount) ? Math.max(Math.round(amount), 0) : 0;
@@ -156,11 +159,20 @@ const getTeamByCode = async (teamCode: string): Promise<TeamRow> => {
   return data as TeamRow;
 };
 
-const ensureTeamCanReceivePlayer = async (teamCode: string): Promise<TeamRow> => {
+const ensureTeamCanReceivePlayer = async (teamCode: string, incomingBidLakhs?: number): Promise<TeamRow> => {
   const team = await getTeamByCode(teamCode);
+  const remainingPurseLakhs = Math.max(TEAM_PURSE_CAP_LAKHS - normalizeAmount(team.spent_lakhs), 0);
 
   if (team.is_blocked) {
     throw new Error(`${team.name} is blocked and cannot receive players.`);
+  }
+
+  if (team.roster_count >= TEAM_SIZE_CAP) {
+    throw new Error(`${team.name} already has ${TEAM_SIZE_CAP} players.`);
+  }
+
+  if (typeof incomingBidLakhs === "number" && incomingBidLakhs > remainingPurseLakhs) {
+    throw new Error(`${team.name} does not have enough purse for this player.`);
   }
 
   return team;
@@ -215,10 +227,15 @@ const assignPlayerToTeam = async (playerId: string, teamCode: string, amountLakh
   assertNonNegativeAmount(amountLakhs, "Sold amount");
 
   const playerRow = await getPlayerRowById(playerId);
-  const receivingTeam = await ensureTeamCanReceivePlayer(teamCode);
+  const soldAmountLakhs = normalizeAmount(amountLakhs);
+
+  if (soldAmountLakhs > TEAM_PURSE_CAP_LAKHS) {
+    throw new Error(`Sold amount cannot exceed ${TEAM_PURSE_CAP_LAKHS} lakhs.`);
+  }
+
+  const receivingTeam = await ensureTeamCanReceivePlayer(teamCode, soldAmountLakhs);
   const previousTeamCode = typeof playerRow.assigned_franchise_code === "string" ? playerRow.assigned_franchise_code : null;
   const previousAmountLakhs = normalizeAmount(playerRow.current_bid_lakhs);
-  const soldAmountLakhs = normalizeAmount(amountLakhs);
 
   if (previousTeamCode && previousTeamCode !== teamCode) {
     await adjustTeamTotals(previousTeamCode, -previousAmountLakhs, -1);
@@ -423,12 +440,15 @@ export const updatePurse = async (teamCode: string, amountLakhs: number, type: P
   assertNonNegativeAmount(amountLakhs, "Purse amount");
 
   const team = await getTeamByCode(teamCode);
-  const nextPurseLakhs =
-    type === "increase" ? team.purse_lakhs + normalizeAmount(amountLakhs) : Math.max(team.purse_lakhs - normalizeAmount(amountLakhs), 0);
+  const currentRemainingPurseLakhs = Math.max(TEAM_PURSE_CAP_LAKHS - normalizeAmount(team.spent_lakhs), 0);
+  const nextRemainingPurseLakhs =
+    type === "increase"
+      ? Math.min(currentRemainingPurseLakhs + normalizeAmount(amountLakhs), TEAM_PURSE_CAP_LAKHS)
+      : Math.max(currentRemainingPurseLakhs - normalizeAmount(amountLakhs), 0);
 
   const { error } = await supabase
     .from("teams")
-    .update({ purse_lakhs: nextPurseLakhs, updated_at: new Date().toISOString() })
+    .update({ purse_lakhs: nextRemainingPurseLakhs, updated_at: new Date().toISOString() })
     .eq("franchise_code", teamCode);
 
   if (error) throw error;

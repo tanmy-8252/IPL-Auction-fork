@@ -41,14 +41,15 @@ const mapTeam = (row: Record<string, unknown>): AdminTeam => {
   const purse = readNumber(getValue(row, "purse"));
   const purseLakhs = readNumber(getValue(row, "purse_lakhs"));
   const spentLakhs = readNumber(getValue(row, "spent_lakhs"));
-  const remainingPurse = "purse" in row ? purse : Math.max(purseLakhs - spentLakhs, 0);
-  const initialPurse = readNumber(getValue(row, "initial_purse")) || purseLakhs || purse || remainingPurse;
+  const remainingPurse = "purse" in row ? purse : Math.max(purseLakhs, 0);
+  const totalBudget = Math.max(purseLakhs + spentLakhs, 10000);
+  const initialPurse = readNumber(getValue(row, "initial_purse")) || totalBudget || purse || remainingPurse;
 
   return {
     id: readString(row.id),
     assignmentId: franchiseCode ?? readString(row.id),
     name: readString(row.name) || franchiseCode || "Unnamed Team",
-    purse: remainingPurse,
+    purse: remainingPurse > 0 || spentLakhs > 0 ? remainingPurse : totalBudget,
     initialPurse,
     isBlocked: Boolean(getValue(row, "is_blocked")),
     franchiseCode,

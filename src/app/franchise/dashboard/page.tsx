@@ -22,6 +22,9 @@ type TeamRow = {
   is_blocked: boolean;
 };
 
+const TEAM_SIZE_CAP = 11;
+const TEAM_PURSE_CAP_LAKHS = 10000; // 100 Cr
+
 type ViewMode = "squad" | "market" | "strategy";
 
 const VIEW_LABELS: Record<ViewMode, string> = {
@@ -464,10 +467,10 @@ function FranchiseDashboardContent() {
     };
   }, [team]);
 
-  const teamBudget = teamRow?.purse_lakhs ?? 1000;
   const teamSpent = teamRow?.spent_lakhs ?? 0;
-  const teamCount = teamRow?.roster_count ?? squadPlayers.length;
+  const teamBudget = TEAM_PURSE_CAP_LAKHS;
   const teamRemaining = Math.max(teamBudget - teamSpent, 0);
+  const teamCount = teamRow?.roster_count ?? squadPlayers.length;
   const theme = franchise ? getFranchiseTheme(franchise.code) : getFranchiseTheme("CSK");
   const teamBrand = franchise ? IPL_COLOR_THEME[franchise.code] : IPL_COLOR_THEME.CSK;
   const bannerColor1 = teamBrand.base;
@@ -577,7 +580,7 @@ function FranchiseDashboardContent() {
                   </div>
                   <div style={{ color: teamTextColor }}>
                     <h1 className="text-4xl font-bold tracking-tight leading-tight">{franchise.name}</h1>
-                    <p className="text-base font-medium mt-1" style={{ color: teamTextColor }}>{teamCount} / 25 Players Signed</p>
+                    <p className="text-base font-medium mt-1" style={{ color: teamTextColor }}>{teamCount} / {TEAM_SIZE_CAP} Players Signed</p>
                   </div>
                 </div>
 

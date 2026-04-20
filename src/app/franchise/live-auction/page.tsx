@@ -19,6 +19,10 @@ type TeamRow = {
   is_blocked: boolean;
 };
 
+const TEAM_SIZE_CAP = 11;
+const TEAM_PURSE_CAP_LAKHS = 10000; // 100 Cr
+const BID_INCREMENT_LAKHS = 50;
+
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : "Unable to load the live auction feed.";
 };
@@ -87,8 +91,29 @@ function FranchiseLiveAuctionContent() {
   const baseBidLakhs = currentPlayer?.basePriceLakhs ?? 0;
   const liveBidLakhs = auctionState?.current_bid ?? 0;
   const minimumNextBidLakhs = useMemo(() => {
-    return Math.max(baseBidLakhs, liveBidLakhs + 5);
+    return Math.max(baseBidLakhs, liveBidLakhs + BID_INCREMENT_LAKHS);
   }, [baseBidLakhs, liveBidLakhs]);
+
+  const isAuctionStarted = auctionState?.status === "bidding";
+  const isTeamFull = (teamRow?.roster_count ?? 0) >= TEAM_SIZE_CAP;
+  const teamSpent = teamRow?.spent_lakhs ?? 0;
+  const teamBudget = TEAM_PURSE_CAP_LAKHS;
+  const teamRemainingPurse = Math.max(teamBudget - teamSpent, 0);
+  const isFundsExhausted = teamRemainingPurse <= 0;
+  const hasInsufficientFundsForNextBid = teamRemainingPurse < minimumNextBidLakhs;
+  const teamRemainingDisplay = teamRemainingPurse;
+
+  const bidBlockReason = useMemo(() => {
+    if (!currentPlayer) return "Cannot place a bid because there is no active player.";
+    if (!isAuctionStarted) return "Bidding has not started yet. Waiting for auctioneer.";
+    if (teamRow?.is_blocked) return "Your franchise is currently blocked from bidding.";
+    if (isTeamFull) return `Squad full. Maximum ${TEAM_SIZE_CAP} players allowed.`;
+    if (isFundsExhausted) return "You have exhausted your funds. Go back and manage your team.";
+    if (hasInsufficientFundsForNextBid) return "Insufficient purse for the next valid bid.";
+    return "";
+  }, [currentPlayer, hasInsufficientFundsForNextBid, isAuctionStarted, isFundsExhausted, isTeamFull, teamRow?.is_blocked]);
+
+  const isBidActionDisabled = isSubmittingBid || Boolean(bidBlockReason);
 
   const cardPlayer = useMemo(() => {
     if (!currentPlayer) {
@@ -234,8 +259,8 @@ function FranchiseLiveAuctionContent() {
       return;
     }
 
-    if (teamRow?.is_blocked) {
-      setErrorMessage("Your franchise is currently blocked from bidding.");
+    if (bidBlockReason) {
+      setErrorMessage(bidBlockReason);
       return;
     }
 
@@ -373,48 +398,53 @@ function FranchiseLiveAuctionContent() {
                   <button
                     type="button"
                     className="ghost-button h-10 min-h-0"
-                    onClick={() => applyBidDelta(-5)}
-                    disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                    onClick={() => applyBidDelta(-BID_INCREMENT_LAKHS)}
+                    disabled={isBidActionDisabled}
                   >
-                    -5 L
+                    -50 L
                   </button>
                   <input
                     type="number"
                     min={minimumNextBidLakhs}
-                    step={5}
+                    step={BID_INCREMENT_LAKHS}
                     value={draftBidLakhs}
                     onChange={(event) => setDraftBidLakhs(Math.max(minimumNextBidLakhs, Number(event.target.value) || minimumNextBidLakhs))}
                     onKeyDown={handleBidInputKeyDown}
                     className="h-10 w-full rounded-[0.7rem] border-[3px] border-[#111111] bg-white px-2 text-center text-base font-black"
-                    disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                    disabled={isBidActionDisabled}
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       className="ghost-button h-10 min-h-0"
-                      onClick={() => applyBidDelta(5)}
-                      disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                      onClick={() => applyBidDelta(BID_INCREMENT_LAKHS)}
+                      disabled={isBidActionDisabled}
                     >
-                      +5 L
+                      +50 L
                     </button>
                     <button
                       type="button"
                       className="ghost-button h-10 min-h-0"
-                      onClick={() => applyBidDelta(10)}
-                      disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                      onClick={() => applyBidDelta(100)}
+                      disabled={isBidActionDisabled}
                     >
-                      +10 L
+                      +1 Cr
                     </button>
                   </div>
                 </div>
                 <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[#666]">Minimum next bid: {formatCr(minimumNextBidLakhs)} • Press Enter to place</p>
+                {bidBlockReason ? (
+                  <p className="mt-2 rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-rose-700">
+                    {bidBlockReason}
+                  </p>
+                ) : null}
               </div>
 
               <button
                 type="button"
                 className="primary-button w-full"
                 onClick={() => void placeBid()}
-                disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                disabled={isBidActionDisabled}
               >
                 {isSubmittingBid ? "Placing Bid..." : `Place Bid ${formatCr(draftBidLakhs)}`}
               </button>
@@ -434,7 +464,7 @@ function FranchiseLiveAuctionContent() {
               </article>
               <article className="rounded-[0.8rem] border-[3px] border-[#111111] bg-[#fffdf7] p-2">
                 <p className="text-[0.62rem] uppercase tracking-[0.18em] text-[#666]">Remaining</p>
-                <strong>{formatCr(teamRow?.purse_lakhs ?? 1000)}</strong>
+                <strong>{formatCr(teamRemainingDisplay)}</strong>
               </article>
             </div>
           </section>

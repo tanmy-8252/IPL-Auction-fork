@@ -162,7 +162,7 @@ export default function AuctioneerTwoPage() {
     setTopBids((data ?? []) as PlayerBidEvent[]);
   };
 
-  const refreshData = async () => {
+  const refreshData = async (): Promise<AuctionStateRow | null> => {
     const [{ data: playersData, error: playersError }, { data: stateData, error: stateError }] =
       await Promise.all([
         supabase
@@ -209,6 +209,8 @@ export default function AuctioneerTwoPage() {
     setAuctionState(nextState);
     await loadTopBids(nextState?.current_player_id ?? null);
 
+    return nextState;
+
   };
 
   useEffect(() => {
@@ -216,10 +218,26 @@ export default function AuctioneerTwoPage() {
 
     const init = async () => {
       try {
-        await refreshData();
+        const latestState = await refreshData();
+
+        if (latestState?.id && latestState.current_player_id && latestState.status !== "bidding") {
+          const { error: startError } = await supabase
+            .from("auction_state")
+            .update({ status: "bidding", updated_at: new Date().toISOString() })
+            .eq("id", latestState.id);
+
+          if (startError) throw startError;
+          await refreshData();
+          if (isMounted) {
+            setNotice("Auction started. Franchises can now place bids.");
+          }
+        }
+
         if (isMounted) {
           setError("");
-          setNotice("");
+          if (!latestState || latestState.status === "bidding") {
+            setNotice("");
+          }
         }
       } catch (initError) {
         if (isMounted) {
