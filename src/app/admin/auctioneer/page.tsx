@@ -33,8 +33,8 @@ export default function AuctioneerPage() {
           </div>
 
           <div className="cta-grid">
-            <button 
-              onClick={() => setShowArena(true)} 
+            <button
+              onClick={() => setShowArena(true)}
               className="primary-button landing-cta"
             >
               Auctioneer Login

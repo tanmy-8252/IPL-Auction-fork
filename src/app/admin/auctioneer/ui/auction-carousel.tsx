@@ -321,7 +321,7 @@ export default function AuctionCarousel({
         <div className="flex flex-1 flex-col justify-start space-y-6 pt-4">
           <div>
             <div className={`text-center text-base font-bold uppercase tracking-[0.4em] mb-2 ${theme.header}`}>
-              Player Stats /*
+              Player Stats
             </div>
             <hr className="border-0 h-px mt-0 opacity-30" style={{ background: activeRarity === "common" ? "rgba(0,229,255,1)" : activeRarity === "epic" ? "rgba(168,85,247,1)" : "rgba(251,191,36,1)" }} />
           </div>
