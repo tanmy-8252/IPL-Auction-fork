@@ -86,8 +86,27 @@ const resolvePlayerImagePath = (row: PlayerRow, slNo: number): string => {
   const rawImage = readString(getValue(row, "image_url", "imageUrl", "photo_url", "avatar_url"));
 
   // If DB already has a full URL/path with an extension, use it directly.
-  if (rawImage && /\.(png|jpe?g|webp|avif|gif|svg)$/i.test(rawImage)) {
+  if (rawImage && /^https?:\/\//i.test(rawImage) && /\.(png|jpe?g|webp|avif|gif|svg)(\?.*)?$/i.test(rawImage)) {
     return rawImage;
+  }
+
+  // If DB stores an absolute site path (for example /images/player.png), use as-is.
+  if (rawImage && rawImage.startsWith("/") && /\.(png|jpe?g|webp|avif|gif|svg)(\?.*)?$/i.test(rawImage)) {
+    return rawImage;
+  }
+
+  // If DB stores only a filename like 1.A.png, resolve it to Supabase public storage URL.
+  if (rawImage && /\.(png|jpe?g|webp|avif|gif|svg)(\?.*)?$/i.test(rawImage)) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const bucket =
+      process.env.NEXT_PUBLIC_PLAYER_IMAGES_BUCKET ??
+      process.env.PLAYER_IMAGES_BUCKET ??
+      "player-images";
+
+    if (supabaseUrl) {
+      const filePath = rawImage.replace(/^\/+/, "");
+      return `${supabaseUrl}/storage/v1/object/public/${bucket}/${filePath}`;
+    }
   }
 
   // If DB value is extension-less or empty, resolve via API route by serial number.
@@ -104,6 +123,7 @@ export const mapAuctionStateRow = (row: Record<string, unknown>): AuctionStateRo
   current_winning_bid_lakhs: readNumber(
     getValue(row, "current_winning_bid_lakhs", "currentWinningBidLakhs"),
   ),
+  auction_round: readNumber(getValue(row, "auction_round", "auctionRound")) || 2,
   status: readStatus(row.status),
 });
 

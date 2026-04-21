@@ -2,24 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PlayerCard from "@/components/PlayerCard";
-import { mapAuctionStateRow, mapPlayerRow } from "@/lib/auctionUtils";
+import { mapAuctionStateRow } from "@/lib/auctionUtils";
 import { supabase } from "@/lib/supabase-client";
+import { mapPlayersForAuctionRound } from "@/services/supabase";
 import type { AuctionStateRow, Player, PlayerRow } from "@/types/player";
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : "Unable to load the live auction feed.";
-};
-
-const sortPlayers = (players: Player[]): Player[] => {
-  return [...players].sort((leftPlayer, rightPlayer) => {
-    if (leftPlayer.slNo !== null && rightPlayer.slNo !== null) {
-      return leftPlayer.slNo - rightPlayer.slNo;
-    }
-
-    if (leftPlayer.slNo !== null) return -1;
-    if (rightPlayer.slNo !== null) return 1;
-    return leftPlayer.name.localeCompare(rightPlayer.name);
-  });
 };
 
 export default function AuctioneerOnePage() {
@@ -55,7 +44,7 @@ export default function AuctioneerOnePage() {
       return data ? mapAuctionStateRow(data as Record<string, unknown>) : null;
     };
 
-    const loadAvailablePlayers = async (): Promise<Player[]> => {
+    const loadAvailablePlayers = async (): Promise<PlayerRow[]> => {
       const { data, error } = await supabase
         .from("players")
         .select("*")
@@ -66,12 +55,15 @@ export default function AuctioneerOnePage() {
         throw error;
       }
 
-      return sortPlayers(((data ?? []) as PlayerRow[]).map((row) => mapPlayerRow(row)));
+      return (data ?? []) as PlayerRow[];
     };
 
     const syncFeed = async () => {
       try {
-        const [nextPlayers, nextAuctionState] = await Promise.all([loadAvailablePlayers(), loadAuctionState()]);
+        const [playerRows, nextAuctionState] = await Promise.all([loadAvailablePlayers(), loadAuctionState()]);
+        const nextPlayers = mapPlayersForAuctionRound(playerRows, nextAuctionState?.auction_round ?? 2, {
+          availableOnly: true,
+        });
 
         if (!isMounted) {
           return;
@@ -99,6 +91,11 @@ export default function AuctioneerOnePage() {
 
     void syncFeed();
 
+    // Poll every 1 second for live updates (aggressive refresh to keep auction live)
+    const intervalId = setInterval(() => {
+      void syncFeed();
+    }, 1000);
+
     const channel = supabase
       .channel("auctioneer1_live_board")
       .on(
@@ -119,6 +116,7 @@ export default function AuctioneerOnePage() {
 
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
       void supabase.removeChannel(channel);
     };
   }, []);

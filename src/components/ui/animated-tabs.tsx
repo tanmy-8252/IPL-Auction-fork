@@ -2,15 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const TABS = ["Squad", "Market", "Strategy"];
+type Tab = { label: string; value: string };
 
-export default function AnimatedTabs() {
-  const [activeTab, setActiveTab] = useState(TABS[0]);
+interface AnimatedTabsProps {
+  tabs: Tab[];
+  activeValue?: string;
+  onTabChange?: (value: string) => void;
+}
+
+export default function AnimatedTabs({ tabs, activeValue, onTabChange }: AnimatedTabsProps) {
+  const isControlled = activeValue !== undefined;
+  const [internalActive, setInternalActive] = useState(tabs[0]?.value ?? "");
+  const currentValue = isControlled ? activeValue : internalActive;
+
   const [activeRect, setActiveRect] = useState({ left: 0, width: 0 });
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
-    const activeIndex = TABS.indexOf(activeTab);
+    const activeIndex = tabs.findIndex((t) => t.value === currentValue);
     const activeElement = tabRefs.current[activeIndex];
 
     if (activeElement) {
@@ -19,22 +28,28 @@ export default function AnimatedTabs() {
         width: activeElement.offsetWidth,
       });
     }
-  }, [activeTab]);
+  }, [currentValue, tabs]);
+
+  const handleClick = (value: string) => {
+    if (!isControlled) setInternalActive(value);
+    onTabChange?.(value);
+  };
 
   return (
-    <div className="relative flex gap-3" style={{ fontFamily: "'Patrick Hand', cursive", margin: "0.8rem 0" }}>
+    <div className="relative flex gap-3" style={{ fontFamily: "var(--font-bricolage), sans-serif" }}>
       {/* Base Layer - Inactive Tabs */}
       <div className="flex gap-3 relative z-10 w-max">
-        {TABS.map((tab, idx) => (
+        {tabs.map((tab, idx) => (
           <button
-            key={tab}
+            key={tab.value}
             ref={(el) => {
               tabRefs.current[idx] = el;
             }}
-            onClick={() => setActiveTab(tab)}
-            className="px-5 py-[0.3rem] text-[1.05rem] font-bold tracking-wide rounded-full border-[2.5px] border-[#222] bg-[#f5f5f5] text-[#555] hover:bg-[#eaeaea] transition-colors focus:outline-none"
+            onClick={() => handleClick(tab.value)}
+            className="px-5 py-[0.35rem] text-[0.94rem] font-bold tracking-[0.12em] border border-[#c8a64d] bg-[#10202a] text-[#d1dde2] transition-colors focus:outline-none"
+            style={{ clipPath: "polygon(10% 0, 100% 0, 90% 100%, 0 100%)" }}
           >
-            {tab}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -48,12 +63,13 @@ export default function AnimatedTabs() {
         }}
       >
         <div className="flex gap-3 w-max">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <div
-              key={tab}
-              className="px-5 py-[0.3rem] text-[1.05rem] font-bold tracking-wide rounded-full border-[2.5px] border-[#222] bg-[#222] text-[#fff] flex items-center justify-center box-border"
+              key={tab.value}
+              className="px-5 py-[0.35rem] text-[0.94rem] font-bold tracking-[0.12em] border border-[#d4af37] bg-linear-to-br from-[#e6c766] to-[#a88a2a] text-[#101820] flex items-center justify-center box-border"
+              style={{ clipPath: "polygon(10% 0, 100% 0, 90% 100%, 0 100%)" }}
             >
-              {tab}
+              {tab.label}
             </div>
           ))}
         </div>

@@ -179,6 +179,11 @@ export const useAuctionData = () => {
 
     void guardedRefresh();
 
+    // Aggressive 1-second polling to keep auction always live
+    const intervalId = setInterval(() => {
+      void guardedRefresh();
+    }, 1000);
+
     const channel = supabase
       .channel("auction_data_hook")
       .on("postgres_changes", { event: "*", schema: "public", table: "auction_state" }, () => {
@@ -194,6 +199,7 @@ export const useAuctionData = () => {
 
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
       void supabase.removeChannel(channel);
     };
   }, [refresh]);

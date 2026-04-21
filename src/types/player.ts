@@ -41,6 +41,7 @@ export interface AuctionStateRow {
   current_bid: number;
   current_winning_franchise_code: string | null;
   current_winning_bid_lakhs: number;
+  auction_round: number;
   status: AuctionStatus;
 }
 

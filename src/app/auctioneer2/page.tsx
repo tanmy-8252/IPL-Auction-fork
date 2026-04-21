@@ -33,31 +33,43 @@ const TIER_STYLES: Record<
     badgeText: string;
     button: string;
     buttonMuted: string;
+    bgHi: string;
+    bgLo: string;
+    bgGrad: string;
   }
 > = {
   common: {
     accent: "#9ca3af",
-    panelBorder: "border-slate-300/45",
+    panelBorder: "border-white/20",
     panelGlow: "shadow-[0_0_40px_rgba(148,163,184,0.22)]",
     badgeText: "text-slate-200",
     button: "bg-slate-300 text-slate-950 hover:bg-slate-200",
     buttonMuted: "bg-slate-700 text-slate-100 hover:bg-slate-600",
+    bgHi: "bg-white/10",
+    bgLo: "bg-white/5",
+    bgGrad: "bg-[linear-gradient(180deg,#0b1731,#091225)]",
   },
   epic: {
-    accent: "#3b82f6",
-    panelBorder: "border-blue-300/45",
-    panelGlow: "shadow-[0_0_40px_rgba(59,130,246,0.25)]",
-    badgeText: "text-blue-200",
-    button: "bg-blue-300 text-slate-950 hover:bg-blue-200",
-    buttonMuted: "bg-blue-900/70 text-blue-100 hover:bg-blue-800/80",
+    accent: "#a855f7",
+    panelBorder: "border-purple-500/40",
+    panelGlow: "shadow-[0_0_40px_rgba(168,85,247,0.25)]",
+    badgeText: "text-purple-200",
+    button: "bg-purple-400 text-slate-950 hover:bg-purple-300",
+    buttonMuted: "bg-purple-900/70 text-purple-100 hover:bg-purple-800/80",
+    bgHi: "bg-[rgba(168,85,247,0.12)]",
+    bgLo: "bg-[rgba(168,85,247,0.06)]",
+    bgGrad: "bg-[linear-gradient(180deg,#190b31,#0f0925)]",
   },
   legendary: {
-    accent: "#f59e0b",
-    panelBorder: "border-amber-300/55",
-    panelGlow: "shadow-[0_0_44px_rgba(245,158,11,0.3)]",
-    badgeText: "text-amber-200",
-    button: "bg-amber-300 text-slate-950 hover:bg-amber-200",
-    buttonMuted: "bg-amber-900/60 text-amber-100 hover:bg-amber-800/75",
+    accent: "#eab308",
+    panelBorder: "border-yellow-500/40",
+    panelGlow: "shadow-[0_0_44px_rgba(234,179,8,0.3)]",
+    badgeText: "text-yellow-200",
+    button: "bg-yellow-400 text-slate-950 hover:bg-yellow-300",
+    buttonMuted: "bg-yellow-900/60 text-yellow-100 hover:bg-yellow-800/75",
+    bgHi: "bg-[rgba(234,179,8,0.12)]",
+    bgLo: "bg-[rgba(234,179,8,0.06)]",
+    bgGrad: "bg-[linear-gradient(180deg,#31230b,#251909)]",
   },
 };
 
@@ -111,6 +123,31 @@ const getTier = (player: Player | null): Tier => {
   return "common";
 };
 
+function CrossfadeImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [slotA, setSlotA] = useState(src);
+  const [slotB, setSlotB] = useState<string | null>(null);
+  const [showB, setShowB] = useState(false);
+
+  useEffect(() => {
+    if (src === slotA) return;
+    setSlotB(src);
+    const t1 = setTimeout(() => setShowB(true), 30);
+    const t2 = setTimeout(() => {
+      setSlotA(src);
+      setSlotB(null);
+      setShowB(false);
+    }, 750);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [src, slotA]);
+
+  return (
+    <>
+      <img src={slotA} alt={alt} className={`${className} absolute transition-opacity duration-700 ease-in-out`} style={{ opacity: showB ? 0 : 1 }} />
+      {slotB && <img src={slotB} alt={alt} className={`${className} absolute transition-opacity duration-700 ease-in-out`} style={{ opacity: showB ? 1 : 0 }} />}
+    </>
+  );
+}
+
 export default function AuctioneerTwoPage() {
   useAuthGuard(AUCTIONEER_EMAILS);
 
@@ -150,7 +187,6 @@ export default function AuctioneerTwoPage() {
       .order("created_at", { ascending: true })
       .limit(3);
 
-    // If migrations are not applied yet, keep screen functional.
     if (bidsError) {
       if (bidsError.code === "42P01" || bidsError.code === "PGRST205") {
         setTopBids([]);
@@ -162,7 +198,7 @@ export default function AuctioneerTwoPage() {
     setTopBids((data ?? []) as PlayerBidEvent[]);
   };
 
-  const refreshData = async () => {
+  const refreshData = async (): Promise<AuctionStateRow | null> => {
     const [{ data: playersData, error: playersError }, { data: stateData, error: stateError }] =
       await Promise.all([
         supabase
@@ -179,7 +215,6 @@ export default function AuctioneerTwoPage() {
     const nextPlayers = sortPlayers(((playersData ?? []) as PlayerRow[]).map((row) => mapPlayerRow(row)));
     let nextState = stateData ? mapAuctionStateRow(stateData as Record<string, unknown>) : null;
 
-    // Keep auction_state as the single source of truth for all connected screens.
     if (nextState?.id && !nextState.current_player_id && nextPlayers[0]?.id) {
       const firstPlayer = nextPlayers[0];
       const { error: bootError } = await supabase
@@ -208,7 +243,7 @@ export default function AuctioneerTwoPage() {
     setPlayers(nextPlayers);
     setAuctionState(nextState);
     await loadTopBids(nextState?.current_player_id ?? null);
-
+    return nextState;
   };
 
   useEffect(() => {
@@ -216,10 +251,26 @@ export default function AuctioneerTwoPage() {
 
     const init = async () => {
       try {
-        await refreshData();
+        const latestState = await refreshData();
+
+        if (latestState?.id && latestState.current_player_id && latestState.status !== "bidding") {
+          const { error: startError } = await supabase
+            .from("auction_state")
+            .update({ status: "bidding", updated_at: new Date().toISOString() })
+            .eq("id", latestState.id);
+
+          if (startError) throw startError;
+          await refreshData();
+          if (isMounted) {
+            setNotice("Auction started. Franchises can now place bids.");
+          }
+        }
+
         if (isMounted) {
           setError("");
-          setNotice("");
+          if (!latestState || latestState.status === "bidding") {
+            setNotice("");
+          }
         }
       } catch (initError) {
         if (isMounted) {
@@ -247,10 +298,9 @@ export default function AuctioneerTwoPage() {
       })
       .subscribe();
 
-    // Fallback for cases where realtime events lag or drop.
     const interval = window.setInterval(() => {
       void refreshData();
-    }, 2000);
+    }, 1000);
 
     return () => {
       isMounted = false;
@@ -272,6 +322,39 @@ export default function AuctioneerTwoPage() {
       window.clearTimeout(timer);
     };
   }, [soldAnnouncement]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const autoStartBidding = async () => {
+      if (!auctionState?.id || !auctionState.current_player_id) return;
+      if (auctionState.status === "bidding") return;
+
+      try {
+        const { error } = await supabase
+          .from("auction_state")
+          .update({ status: "bidding", updated_at: new Date().toISOString() })
+          .eq("id", auctionState.id);
+
+        if (error) throw error;
+
+        if (isMounted) {
+          await refreshData();
+          setNotice("Bidding started. Franchises can now place bids.");
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(getErrorMessage(err));
+        }
+      }
+    };
+
+    void autoStartBidding();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [auctionState?.current_player_id, auctionState?.id]);
 
   const updateAuctionState = async (updates: {
     current_player_id?: string | null;
@@ -392,207 +475,153 @@ export default function AuctioneerTwoPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050a17] px-4 py-5 text-white sm:px-6 lg:px-8">
+    <main className="relative h-screen w-full overflow-hidden bg-[#050a17] px-4 py-4 sm:px-6 lg:px-8 flex flex-col">
       <div className="absolute inset-0 z-0 opacity-85">
         <SilkBackgroundAnimation rarity={tier} />
       </div>
       <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_top,_rgba(3,7,18,0.18),rgba(3,7,18,0.78)_65%)]" />
 
-      <div className="relative z-20 mx-auto flex min-h-[92vh] max-w-7xl items-center justify-center">
-        <section
-          className={`w-full max-w-6xl rounded-[1.8rem] border bg-[linear-gradient(180deg,rgba(18,22,30,0.92),rgba(7,10,16,0.96))] ${tierStyle.panelBorder} ${tierStyle.panelGlow}`}
-          style={{ boxShadow: `inset 0 0 0 1px ${tierStyle.accent}55` }}
-        >
-          <header className="rounded-t-[1.8rem] border-b border-white/10 bg-[linear-gradient(90deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] px-5 py-4 sm:px-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-[0.66rem] font-semibold uppercase tracking-[0.35em] text-white/70">TATA IPL AUCTION 2025</p>
-                <h1 className={`mt-2 text-3xl font-black uppercase tracking-tight sm:text-4xl ${tierStyle.badgeText}`}>Live Auction Card</h1>
-              </div>
-              <div className="text-right">
-                <p className="text-[0.6rem] uppercase tracking-[0.3em] text-white/65">Tier</p>
-                <p className={`mt-1 text-sm font-bold uppercase tracking-[0.24em] ${tierStyle.badgeText}`}>{tier}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setShowLiveBidPanel((previous) => !previous)}
-                className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[0.64rem] font-bold uppercase tracking-[0.22em] text-white transition hover:bg-white/15"
-              >
-                {showLiveBidPanel ? "Hide Live Bid" : "Show Live Bid"}
-              </button>
-              <p className="text-[0.66rem] uppercase tracking-[0.24em] text-white/75">
-                Highest Bid: <strong className="text-white">{formatLakhs(currentBidLakhs)}</strong> by <strong className="text-white">{leadingFranchiseCode}</strong>
-              </p>
-            </div>
-          </header>
+      <header className="relative z-30 flex flex-wrap items-start justify-between gap-4 flex-none">
+        <div className="flex flex-col gap-2">
+          <div>
+            <p className="text-[0.66rem] font-semibold uppercase tracking-[0.35em] text-white/70">TATA IPL AUCTION 2025</p>
+            <h1 className={`mt-0.5 text-3xl font-black uppercase tracking-tight ${tierStyle.badgeText}`}>Live Auction Card</h1>
+          </div>
+        </div>
+      </header>
+
+      <div className="relative z-20 flex flex-1 w-full overflow-hidden">
+        <section className="w-full">
 
           {error ? (
             <div className="mx-5 mt-4 rounded-xl border border-red-300/30 bg-red-500/10 px-4 py-3 text-sm text-red-100 sm:mx-8">{error}</div>
           ) : null}
-          {notice ? (
-            <div className="mx-5 mt-4 rounded-xl border border-emerald-300/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100 sm:mx-8">{notice}</div>
-          ) : null}
+
 
           {activePlayer ? (
-            <div className="grid gap-6 p-5 sm:p-8 lg:grid-cols-[340px_minmax(0,1fr)]">
-              {!isCardReady ? (
-                <div className="col-span-full grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-                  <aside className="space-y-4">
-                    <div className="rounded-[1.4rem] border border-white/20 bg-[linear-gradient(180deg,#0d1528,#101d36)] p-4 animate-pulse">
-                      <div className="mx-auto aspect-square w-full max-w-[290px] rounded-full border border-white/15 bg-white/10" />
+            <div className="grid gap-6 lg:gap-14 p-5 sm:p-8 lg:grid-cols-[340px_minmax(0,1fr)]">
+              <aside className="flex flex-col justify-end h-full mt-4 sm:mt-0">
+                <div className="relative w-full flex-1 flex flex-col justify-end mb-2">
+                  <CrossfadeImage src={playerImage} alt={activePlayer.name} className="inset-0 max-h-[60vh] h-full w-full object-contain object-left-bottom drop-shadow-[0_0_30px_rgba(0,0,0,0.6)] origin-bottom-left" />
+                </div>
+                <div className="w-full text-center sm:text-left pl-2 relative z-10 shrink-0">
+                  <span className={`inline-block rounded-full border px-4 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.3em] mb-4 backdrop-blur-sm ${tier === 'common' ? 'border-[#0e7490]/70 text-[#cffafe] bg-[#083344]/60' :
+                    tier === 'epic' ? 'border-[#4f46e5]/70 text-[#e0e7ff] bg-[#312e81]/60' :
+                      'border-[#d97706]/70 text-[#fef3c7] bg-[#78350f]/60'
+                    }`}>
+                    {tier}
+                  </span>
+                  <h2 className="text-5xl font-black uppercase tracking-tight sm:text-[4rem] text-white mb-3 leading-[0.85] sm:leading-[0.85]" style={{ fontFamily: "Georgia, serif" }}>
+                    {activePlayer.name}
+                  </h2>
+                  <p className={`text-[0.8rem] font-black uppercase tracking-[0.2em] ${tier === 'common' ? 'text-[#22d3ee]' : tier === 'epic' ? 'text-[#818cf8]' : 'text-[#fbbf24]'}`}>
+                    {activePlayer.role}
+                  </p>
+                </div>
+              </aside>
+
+              <div className="flex flex-col gap-3 justify-center h-full">
+                {showLiveBidPanel ? (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgHi} px-4 py-3`}>
+                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/75">Current Highest Bid</p>
+                      <p className={`mt-1 text-2xl lg:text-3xl font-black ${tierStyle.badgeText}`}>{formatLakhs(currentBidLakhs)}</p>
                     </div>
-                    <div className="h-20 rounded-[1rem] border border-white/20 bg-white/10 animate-pulse" />
-                  </aside>
-                  <div className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
+                    <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgHi} px-4 py-3`}>
+                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/75">Leading Franchise</p>
+                      <p className="mt-1 text-2xl lg:text-3xl font-black text-white">{leadingFranchiseCode}</p>
                     </div>
-                    <div className="h-32 rounded-[1rem] border border-white/20 bg-white/10 animate-pulse" />
-                    <div className="h-28 rounded-[1rem] border border-white/20 bg-white/10 animate-pulse" />
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
+                    <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgHi} px-4 py-3`}>
+                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/75">Top 3 Bids</p>
+                      <p className="mt-1 text-xl lg:text-2xl font-black text-white">{topBids.length || 0} Live</p>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                      <div className="h-24 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                    </div>
-                    <div className="h-36 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                    <div className="flex gap-3 justify-end">
-                      <div className="h-12 w-36 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                      <div className="h-12 w-36 rounded-xl border border-white/20 bg-white/10 animate-pulse" />
-                    </div>
+                  </div>
+                ) : null}
+
+                <div className={`rounded-2xl border ${tierStyle.panelBorder} ${tierStyle.bgGrad} p-3`}>
+                  <div className="grid grid-cols-4 gap-2 text-center text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/70">
+                    <div>Format</div>
+                    <div>Mtch</div>
+                    <div>Runs</div>
+                    <div>Wkts</div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-4 gap-2 text-center text-2xl lg:text-3xl font-black tracking-tight">
+                    <div className="rounded-lg border border-white/10 bg-white/5 py-1.5 text-white/95">T20</div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 py-1.5 text-white">{activePlayer.matchesPlayed}</div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 py-1.5 text-white">{activePlayer.totalRuns}</div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 py-1.5 text-white">{activePlayer.wicketsTaken}</div>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <aside className="space-y-4 animate-[cardReveal_320ms_ease-out]">
-                    <div className="rounded-[1.4rem] border border-white/20 bg-[linear-gradient(180deg,#0d1528,#101d36)] p-4">
-                      <div className="mx-auto aspect-square w-full max-w-[290px] overflow-hidden rounded-full border border-white/30 bg-black/30 p-2 shadow-[inset_0_0_30px_rgba(255,255,255,0.06)]">
-                        <img src={playerImage} alt={activePlayer.name} className="h-full w-full rounded-full object-cover" />
-                      </div>
-                    </div>
-                    <div className="rounded-[1rem] border border-white/20 bg-[linear-gradient(180deg,#d4d6dc,#8c919e)] px-5 py-3 text-center text-4xl font-black text-slate-900">
-                      {formatLakhs(activePlayer.basePriceLakhs)}
-                    </div>
-                  </aside>
 
-                  <div className="space-y-4 animate-[cardReveal_320ms_ease-out]">
-                    {showLiveBidPanel ? (
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
-                          <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/65">Current Highest Bid</p>
-                          <p className={`mt-1 text-3xl font-black ${tierStyle.badgeText}`}>{formatLakhs(currentBidLakhs)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
-                          <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/65">Leading Franchise</p>
-                          <p className="mt-1 text-3xl font-black text-white">{leadingFranchiseCode}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
-                          <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/65">Top 3 Bids</p>
-                          <p className="mt-1 text-xl font-black text-white">{topBids.length || 0} Live</p>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="rounded-[1rem] border border-white/20 bg-[linear-gradient(180deg,#0d1b37,#0c1830)] px-5 py-4">
-                      <h2 className={`text-4xl font-black uppercase tracking-tight sm:text-5xl ${tierStyle.badgeText}`}>{activePlayer.name}</h2>
-                      <p className="mt-2 text-xl font-bold uppercase tracking-wide text-white/90">{activePlayer.country || "Unknown"}</p>
-                      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/70">{activePlayer.role}</p>
-                    </div>
-
-                    <div className="rounded-[1rem] border border-white/20 bg-[linear-gradient(180deg,#0b1731,#091225)] p-3">
-                      <div className="grid grid-cols-4 gap-2 text-center text-xs font-bold uppercase tracking-[0.18em] text-white/70">
-                        <div>Format</div>
-                        <div>Mtch</div>
-                        <div>Runs</div>
-                        <div>Wkts</div>
-                      </div>
-                      <div className="mt-2 grid grid-cols-4 gap-2 text-center text-3xl font-black">
-                        <div className="rounded-lg border border-white/10 bg-white/5 py-2 text-white/95">T20</div>
-                        <div className="rounded-lg border border-white/10 bg-white/5 py-2 text-white">{activePlayer.matchesPlayed}</div>
-                        <div className="rounded-lg border border-white/10 bg-white/5 py-2 text-white">{activePlayer.totalRuns}</div>
-                        <div className="rounded-lg border border-white/10 bg-white/5 py-2 text-white">{activePlayer.wicketsTaken}</div>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-center">
-                        <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/60">Bat Avg</p>
-                        <p className="mt-1 text-2xl font-black text-white">{activePlayer.battingAverage.toFixed(2)}</p>
-                      </div>
-                      <div className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-center">
-                        <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/60">Strike Rate</p>
-                        <p className="mt-1 text-2xl font-black text-white">{activePlayer.stats.strikeRate.toFixed(2)}</p>
-                      </div>
-                      <div className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-center">
-                        <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/60">Bowl Avg</p>
-                        <p className="mt-1 text-2xl font-black text-white">{activePlayer.bowlingAverage.toFixed(2)}</p>
-                      </div>
-                      <div className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-center">
-                        <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/60">Economy</p>
-                        <p className="mt-1 text-2xl font-black text-white">{activePlayer.economy.toFixed(2)}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                        <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/60">Current Price</p>
-                        <p className={`mt-1 text-3xl font-black ${tierStyle.badgeText}`}>
-                          {formatLakhs(currentBidLakhs)}
-                        </p>
-                        <p className="text-xs uppercase tracking-[0.2em] text-white/55">Status: {auctionState?.status ?? "idle"}</p>
-                      </div>
-                      <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                        <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/60">Best Bowling</p>
-                        <p className="mt-1 text-3xl font-black text-white">{activePlayer.bestBowling || "N/A"}</p>
-                        <p className="text-xs uppercase tracking-[0.2em] text-white/55">Credit Points: {activePlayer.creditPoints}</p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                      <p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/60">Top 3 Bids (Live)</p>
-                      {topBids.length ? (
-                        <div className="mt-2 grid gap-2">
-                          {topBids.map((bid, index) => (
-                            <div key={bid.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/75">#{index + 1} {bid.franchise_code}</p>
-                              <p className="text-lg font-black text-white">{formatLakhs(bid.bid_lakhs)}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/55">No bids recorded yet for this player.</p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap justify-end gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => void lockBid()}
-                        disabled={isSaving || !activePlayer}
-                        className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.22em] transition disabled:cursor-not-allowed disabled:opacity-50 ${tierStyle.button}`}
-                      >
-                        Lock Bid
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void nextPlayer()}
-                        disabled={isSaving || !players.length}
-                        className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.22em] transition disabled:cursor-not-allowed disabled:opacity-50 ${tierStyle.buttonMuted}`}
-                      >
-                        Next Player
-                      </button>
-                    </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgLo} px-3 py-3 text-center`}>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60">Bat Avg</p>
+                    <p className="mt-1 text-xl lg:text-2xl font-black text-white">{activePlayer.battingAverage.toFixed(2)}</p>
                   </div>
-                </>
-              )}
+                  <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgLo} px-3 py-3 text-center`}>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60">Strike Rate</p>
+                    <p className="mt-1 text-xl lg:text-2xl font-black text-white">{activePlayer.stats.strikeRate.toFixed(2)}</p>
+                  </div>
+                  <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgLo} px-3 py-3 text-center`}>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60">Bowl Avg</p>
+                    <p className="mt-1 text-xl lg:text-2xl font-black text-white">{activePlayer.bowlingAverage.toFixed(2)}</p>
+                  </div>
+                  <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgLo} px-3 py-3 text-center`}>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60">Economy</p>
+                    <p className="mt-1 text-xl lg:text-2xl font-black text-white">{activePlayer.economy.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgLo} px-4 py-3 flex flex-col justify-center`}>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60">Current Price</p>
+                    <p className={`mt-1 text-2xl lg:text-3xl font-black ${tierStyle.badgeText}`}>
+                      {formatLakhs(currentBidLakhs)}
+                    </p>
+                    <p className="mt-0.5 text-[0.65rem] uppercase tracking-[0.2em] text-white/55">Status: {auctionState?.status ?? "idle"}</p>
+                  </div>
+                  <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgLo} px-4 py-3 flex flex-col justify-center`}>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60">Best Bowling</p>
+                    <p className="mt-1 text-2xl lg:text-3xl font-black text-white">{activePlayer.bestBowling || "N/A"}</p>
+                    <p className="mt-0.5 text-[0.65rem] uppercase tracking-[0.2em] text-white/55">Credit Points: {activePlayer.creditPoints}</p>
+                  </div>
+                </div>
+
+                <div className={`rounded-xl border ${tierStyle.panelBorder} ${tierStyle.bgLo} px-4 py-2.5`}>
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-white/60">Top 3 Bids (Live)</p>
+                  {topBids.length ? (
+                    <div className="mt-2 grid gap-1.5">
+                      {topBids.map((bid, index) => (
+                        <div key={bid.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
+                          <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/75">#{index + 1} {bid.franchise_code}</p>
+                          <p className="text-[0.95rem] font-black text-white">{formatLakhs(bid.bid_lakhs)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-[0.65rem] uppercase tracking-[0.2em] text-white/55">No bids recorded yet for this player.</p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => void lockBid()}
+                    disabled={isSaving || !activePlayer}
+                    className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.22em] transition disabled:cursor-not-allowed disabled:opacity-50 ${tierStyle.button}`}
+                  >
+                    Lock Bid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void nextPlayer()}
+                    disabled={isSaving || !players.length}
+                    className={`rounded-xl px-6 py-3 text-sm font-black uppercase tracking-[0.22em] transition disabled:cursor-not-allowed disabled:opacity-50 ${tierStyle.buttonMuted}`}
+                  >
+                    Next Player
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="grid min-h-[46vh] place-items-center p-10 text-center">

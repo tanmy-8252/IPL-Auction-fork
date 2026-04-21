@@ -1,14 +1,14 @@
 export const teamGradients: Record<string, string[]> = {
-  LSG: ["#0B3D91", "#FF8C00"],
-  MI: ["#0A2A66", "#C8A951"],
-  CSK: ["#1E3A5F", "#FFD700"],
-  KKR: ["#3A0CA3", "#D4AF37"],
-  SRH: ["#2B0F0F", "#FF6A00"],
-  RR: ["#2A5C8A", "#FF8FA3"],
-  PBKS: ["#C1121F", "#F4A261"],
-  DC: ["#1D3557", "#E63946"],
-  GT: ["#111111", "#C9A74E"],
-  RCB: ["#000000", "#FF0000"]
+  LSG: ["#0b2f44", "#d4af37"],
+  MI: ["#102a56", "#c8a64d"],
+  CSK: ["#14303c", "#e3c15c"],
+  KKR: ["#2f2348", "#caa949"],
+  SRH: ["#3c2418", "#d08b3a"],
+  RR: ["#5a2d43", "#cd8f57"],
+  PBKS: ["#3f1f28", "#ca8e49"],
+  DC: ["#17344f", "#c89c4a"],
+  GT: ["#101820", "#c5a24f"],
+  RCB: ["#26171a", "#d49a50"]
 };
 
 export const teamGradientDirection: Record<string, string> = {

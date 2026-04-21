@@ -7,9 +7,9 @@ interface PlayerCardProps {
 }
 
 const statusStyles: Record<string, string> = {
-  bidding: "bg-[#082854] text-[#fdfbf7] border-[#082854]",
-  sold: "bg-[#c8a34f] text-[#082854] border-[#b48b34]",
-  unsold: "bg-[#f3e6cc] text-[#7a2323] border-[#d8c097]",
+  bidding: "bg-[#173441] text-[#f5f7f8] border-[#2f596b]",
+  sold: "bg-[#d4af37] text-[#101820] border-[#a88a2a]",
+  unsold: "bg-[#2a1718] text-[#ffcdc8] border-[#7a2d30]",
 };
 
 const formatLakhs = (amount: number): string => {
@@ -29,23 +29,24 @@ export default function PlayerCard({ player, className = "" }: PlayerCardProps) 
 
   const displayImage =
     player.imageUrl ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=082854&color=fff&size=512&bold=true`;
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=12303A&color=fff&size=512&bold=true`;
 
   return (
     <article
-      className={`relative overflow-hidden rounded-[2rem] border border-[#d9cdb5] bg-[#fdfbf7] text-[#082854] shadow-[0_30px_80px_rgba(8,40,84,0.16)] ${className}`}
+      className={`relative overflow-hidden border border-[#2b4550] bg-[#0f1a20] text-[#ffffff] shadow-[0_22px_70px_rgba(0,0,0,0.42)] ${className}`}
+      style={{ clipPath: "polygon(2% 0, 100% 0, 98% 100%, 0 100%)" }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(200,163,79,0.22),_transparent_28%),linear-gradient(135deg,_rgba(8,40,84,0.04),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.82),_rgba(253,251,247,1))]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#082854] via-[#c8a34f] to-[#082854]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.2),transparent_28%),linear-gradient(135deg,rgba(18,48,58,0.45),transparent_48%),linear-gradient(180deg,rgba(16,28,35,0.92),rgba(12,22,27,0.98))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-linear-to-r from-[#12303a] via-[#d4af37] to-[#12303a]" />
 
       <div className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:gap-10 lg:p-10">
         <div className="grid gap-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-2">
-              <span className="inline-flex items-center rounded-full border border-[#d7c7a7] bg-white/85 px-4 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.32em] text-[#6e5a2d]">
+              <span className="inline-flex items-center border border-[#36525e] bg-[#12212b] px-4 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.32em] text-[#e6c766]">
                 {lotNumber !== null ? `Lot #${String(lotNumber).padStart(2, "0")}` : "Live Lot"}
               </span>
-              <span className="inline-flex items-center justify-center rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-widest text-blue-800">
+              <span className="inline-flex items-center justify-center border border-[#244a58] bg-[#17313d] px-3 py-1 text-[0.65rem] font-bold uppercase tracking-widest text-[#d4e7ef]">
                 {player.category === "Overseas" ? "Overseas" : "Domestic"}
               </span>
             </div>
@@ -56,25 +57,25 @@ export default function PlayerCard({ player, className = "" }: PlayerCardProps) 
             </span>
           </div>
 
-          <div className="relative mx-auto flex aspect-[4/5] w-full max-w-[320px] items-end justify-center overflow-hidden rounded-[1.7rem] border border-[#dbcba8] bg-[linear-gradient(180deg,#efe3c6_0%,#d7bf8b_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            <div className="absolute inset-x-6 top-5 h-px bg-gradient-to-r from-transparent via-[#082854]/30 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent_0%,rgba(8,40,84,0.12)_100%)]" />
+          <div className="relative mx-auto flex aspect-4/5 w-full max-w-[320px] items-end justify-center overflow-hidden border border-[#375363] bg-[linear-gradient(180deg,#18313d_0%,#10232d_100%)] shadow-[inset_0_1px_0_rgba(230,199,102,0.18)]">
+            <div className="absolute inset-x-6 top-5 h-px bg-linear-to-r from-transparent via-[#d4af37]/45 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent_0%,rgba(0,0,0,0.35)_100%)]" />
             <img
               src={displayImage}
               alt={player.name}
-              className="h-[92%] w-[92%] object-contain drop-shadow-[0_22px_30px_rgba(8,40,84,0.25)]"
+              className="h-[92%] w-[92%] object-contain drop-shadow-[0_22px_30px_rgba(0,0,0,0.42)]"
             />
           </div>
 
-          <div className="rounded-[1.5rem] border border-[#decfae] bg-[#fffdfa] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.34em] text-[#6b5a37]">Vital Statistics</p>
+          <div className="border border-[#355364] bg-[#11212b] p-5 shadow-[inset_0_1px_0_rgba(230,199,102,0.16)]">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.34em] text-[#e6c766]">Vital Statistics</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-[#e8dcc4] bg-[#fffaf0] px-4 py-3">
-                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#776744]">Matches</p>
+              <div className="border border-[#2d4d5f] bg-[#18313d] px-4 py-3">
+                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#9eb0b8]">Matches</p>
                 <p className="mt-1 font-display text-2xl">{player.stats.matches}</p>
               </div>
-              <div className="rounded-2xl border border-[#e8dcc4] bg-[#fffaf0] px-4 py-3">
-                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#776744]">H.S.</p>
+              <div className="border border-[#2d4d5f] bg-[#18313d] px-4 py-3">
+                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#9eb0b8]">H.S.</p>
                 <p className="mt-1 font-display text-2xl">{player.stats.highestScore || "N/A"}</p>
               </div>
             </div>
@@ -84,31 +85,31 @@ export default function PlayerCard({ player, className = "" }: PlayerCardProps) 
         <div className="grid gap-6">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold uppercase tracking-[0.42em] text-[#7d6a39]">{player.role}</p>
-              <p className="text-[0.7rem] font-bold tracking-widest text-[#082854]/40">{player.country}</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.42em] text-[#e6c766]">{player.role}</p>
+              <p className="text-[0.7rem] font-bold tracking-widest text-[#9aabb4]">{player.country}</p>
             </div>
 
             <div className="flex flex-wrap items-end gap-4">
               <h1 className="font-display text-4xl leading-none sm:text-5xl lg:text-[4rem]">{player.name}</h1>
-              <div className="h-px min-w-24 flex-1 bg-gradient-to-r from-[#c8a34f] via-[#082854]/35 to-transparent" />
+              <div className="h-px min-w-24 flex-1 bg-linear-to-r from-[#d4af37] via-[#244656] to-transparent" />
             </div>
 
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[#5f6980]">
-              Former: <span className="text-[#082854]">{player.teams || "N/A"}</span>
+            <p className="text-[0.7rem] font-medium uppercase tracking-[0.2em] text-[#9eb0b8]">
+              Former: <span className="text-[#ffffff]">{player.teams || "N/A"}</span>
             </p>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-[1.6rem] border border-[#0e2a57] bg-[#082854] p-6 text-[#fdfbf7] shadow-[0_20px_40px_rgba(8,40,84,0.2)]">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.36em] text-[#d4b467]">Base Price</p>
+            <section className="border border-[#355463] bg-[#12303a] p-6 text-[#fdfdfd] shadow-[0_20px_40px_rgba(0,0,0,0.28)]">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.36em] text-[#e6c766]">Base Price</p>
               <p className="mt-4 font-display text-4xl leading-none sm:text-[3.2rem]">{formatLakhs(player.basePriceLakhs)}</p>
-              <p className="mt-3 text-sm uppercase tracking-[0.22em] text-[#d9dfef]">Reserve Valuation</p>
+              <p className="mt-3 text-sm uppercase tracking-[0.22em] text-[#c6d4da]">Reserve Valuation</p>
             </section>
 
-            <section className="rounded-[1.6rem] border border-[#d8bd79] bg-[linear-gradient(135deg,#f8edd3_0%,#efd29a_100%)] p-6 text-[#082854] shadow-[0_20px_40px_rgba(200,163,79,0.18)]">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.36em] text-[#7c6430]">Current Bid</p>
+            <section className="border border-[#d4af37] bg-[linear-gradient(135deg,#e6c766_0%,#a88a2a_100%)] p-6 text-[#101820] shadow-[0_20px_40px_rgba(212,175,55,0.2)]">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.36em] text-[#293641]">Current Bid</p>
               <p className="mt-4 font-display text-4xl leading-none sm:text-[3.2rem]">{currentBidLabel}</p>
-              <p className="mt-3 text-sm uppercase tracking-[0.22em] text-[#5f4a1d]">
+              <p className="mt-3 text-sm uppercase tracking-[0.22em] text-[#293641]">
                 {player.currentBidLakhs === 0 ? "Waiting for Entry" : "Live High Offer"}
               </p>
             </section>
@@ -116,26 +117,26 @@ export default function PlayerCard({ player, className = "" }: PlayerCardProps) 
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {player.stats.runs !== undefined ? (
-              <div className="rounded-[1.35rem] border border-[#e5d7bc] bg-white/90 px-5 py-4">
-                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#776744]">Runs</p>
+              <div className="border border-[#2f4e5f] bg-[#172f3b] px-5 py-4">
+                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#7b8f99]">Runs</p>
                 <p className="mt-2 font-display text-3xl leading-none">{player.stats.runs}</p>
               </div>
             ) : null}
 
             {player.stats.wickets !== undefined && player.stats.wickets > 0 ? (
-              <div className="rounded-[1.35rem] border border-[#e5d7bc] bg-white/90 px-5 py-4">
-                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#776744]">Wickets</p>
+              <div className="border border-[#2f4e5f] bg-[#172f3b] px-5 py-4">
+                <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#7b8f99]">Wickets</p>
                 <p className="mt-2 font-display text-3xl leading-none">{player.stats.wickets}</p>
               </div>
             ) : null}
 
-            <div className="rounded-[1.35rem] border border-[#e5d7bc] bg-white/90 px-5 py-4">
-              <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#776744]">Average</p>
+            <div className="border border-[#2f4e5f] bg-[#172f3b] px-5 py-4">
+              <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#7b8f99]">Average</p>
               <p className="mt-2 font-display text-3xl leading-none">{formatMetric(player.stats.average)}</p>
             </div>
 
-            <div className="rounded-[1.35rem] border border-[#e5d7bc] bg-white/90 px-5 py-4">
-              <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#776744]">S.R.</p>
+            <div className="border border-[#2f4e5f] bg-[#172f3b] px-5 py-4">
+              <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#7b8f99]">S.R.</p>
               <p className="mt-2 font-display text-3xl leading-none">{formatMetric(player.stats.strikeRate)}</p>
             </div>
           </div>

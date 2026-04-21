@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase-client";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 
@@ -18,6 +18,7 @@ type Player = {
 
 type Team = {
   id: string;
+  franchise_code: string;
   name: string;
   is_blocked: boolean;
   purse: number;
@@ -28,7 +29,14 @@ type AuctionState = {
   current_player_id: string | null;
   current_bid: number;
   current_team_id: string | null;
+  auction_round: number;
   status: AuctionStatus;
+};
+
+type StrategyPickRow = {
+  team_code: string;
+  player_id: string;
+  slot: number;
 };
 
 type ButtonVariant = "green" | "red" | "blue" | "yellow" | "purple" | "gray";
@@ -119,6 +127,7 @@ function normalizePlayerRow(row: any): Player {
 function normalizeTeamRow(row: any): Team {
   return {
     id: row.id,
+    franchise_code: row.franchise_code ?? row.code ?? row.id,
     name: row.name ?? "",
     is_blocked: Boolean(row.is_blocked),
     purse: normalizePurse(row.purse),
@@ -136,8 +145,18 @@ function normalizeAuctionStateRow(row: any): AuctionState {
     current_player_id: row.current_player_id ?? null,
     current_bid: normalizePurse(row.current_bid),
     current_team_id: row.current_team_id ?? null,
+    auction_round: Number(row.auction_round ?? 2) || 2,
     status,
   };
+}
+
+function isMissingTableError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const errorRecord = error as Record<string, unknown>;
+  return errorRecord.code === "42P01" || errorRecord.code === "PGRST205";
 }
 
 function upsertById<T extends { id: string }>(rows: T[], row: T) {
@@ -168,6 +187,7 @@ export default function SuperAdminPage() {
   const [bidOverrideInput, setBidOverrideInput] = useState("");
   const [teamOverrideId, setTeamOverrideId] = useState("");
   const [assignmentPriceInput, setAssignmentPriceInput] = useState("");
+  const [strategyPicks, setStrategyPicks] = useState<StrategyPickRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -262,7 +282,7 @@ export default function SuperAdminPage() {
       // FETCH TEAMS
       const { data: teamsDataRaw, error: teamsError } = await supabase
         .from("teams")
-        .select("id, name, is_blocked, purse");
+        .select("id, franchise_code, name, is_blocked, purse");
 
       if (teamsError) throw teamsError;
 
@@ -271,7 +291,7 @@ export default function SuperAdminPage() {
       // FETCH AUCTION STATE
       const { data: auctionData, error: auctionError } = await supabase
         .from("auction_state")
-        .select("id, current_player_id, current_bid, current_team_id, status")
+        .select("id, current_player_id, current_bid, current_team_id, auction_round, status")
         .limit(1)
         .maybeSingle();
 
@@ -281,9 +301,26 @@ export default function SuperAdminPage() {
         ? normalizeAuctionStateRow(auctionData)
         : null;
 
+      const { data: strategyDataRaw, error: strategyError } = await supabase
+        .from("team_strategy_picks")
+        .select("team_code, player_id, slot")
+        .order("team_code", { ascending: true })
+        .order("slot", { ascending: true });
+
+      if (strategyError && !isMissingTableError(strategyError)) throw strategyError;
+
+      const nextStrategyPicks = ((strategyDataRaw ?? []) as StrategyPickRow[]).sort((left, right) => {
+        if (left.team_code === right.team_code) {
+          return left.slot - right.slot;
+        }
+
+        return left.team_code.localeCompare(right.team_code);
+      });
+
       setPlayers(playersData);
       setTeams(teamsData);
       setAuctionState(nextAuctionState);
+      setStrategyPicks(nextStrategyPicks);
 
       setSelectedPlayerId((currentId) =>
         playersData.some((p) => p.id === currentId)
@@ -445,14 +482,97 @@ export default function SuperAdminPage() {
     await updateAuctionState({ status: "stopped" }, "Auction stopped.");
   };
 
+  const runResetFallback = async () => {
+    const timestamp = new Date().toISOString();
+
+    const [{ error: stateError }, { error: playersError }, { error: teamsError }] = await Promise.all([
+      supabase
+        .from("auction_state")
+        .update({
+          current_player_id: null,
+          current_bid_lakhs: 0,
+          current_winning_franchise_code: null,
+          current_winning_bid_lakhs: 0,
+          auction_round: 2,
+          status: "idle",
+          updated_at: timestamp,
+        })
+        .not("id", "is", null),
+      supabase
+        .from("players")
+        .update({
+          assigned_franchise_code: null,
+          last_bidder_code: null,
+          current_bid_lakhs: 0,
+          auction_status: "unsold",
+          assigned_at: null,
+          updated_at: timestamp,
+        })
+        .not("id", "is", null),
+      supabase
+        .from("teams")
+        .update({
+          purse_lakhs: 10000,
+          spent_lakhs: 0,
+          roster_count: 0,
+          round3_qualified: false,
+          is_blocked: false,
+          updated_at: timestamp,
+        })
+        .not("franchise_code", "is", null),
+    ]);
+
+    if (stateError) throw stateError;
+    if (playersError) throw playersError;
+    if (teamsError) throw teamsError;
+
+    const { error: strategyDeleteError } = await supabase
+      .from("team_strategy_picks")
+      .delete()
+      .not("id", "is", null);
+
+    if (strategyDeleteError && !isMissingTableError(strategyDeleteError)) {
+      throw strategyDeleteError;
+    }
+  };
+
   const handleResetAuction = async () => {
     if (!window.confirm("Reset the entire auction? This will clear all player assignments and reset team purses.")) {
       return;
     }
 
     await runMutation("Auction fully reset.", async () => {
-      // This calls the SQL function you just updated in the dashboard
       const { error } = await supabase.rpc('reset_full_auction');
+
+      if (!error) {
+        return;
+      }
+
+      await runResetFallback();
+    });
+  };
+
+  const handleStartRoundThree = async () => {
+    if (!window.confirm("Proceed to Round 3? This will release every non-strategy player and keep only the selected strategy picks.")) {
+      return;
+    }
+
+    await runMutation("Round 3 started.", async () => {
+      const { error } = await supabase.rpc("start_round_three");
+
+      if (error) {
+        throw error;
+      }
+    });
+  };
+
+  const handleSwitchToRoundTwo = async () => {
+    if (!window.confirm("Switch back to Round 2? This keeps the current squads and re-enables the normal auction flow.")) {
+      return;
+    }
+
+    await runMutation("Switched back to Round 2.", async () => {
+      const { error } = await supabase.rpc("switch_to_round_two");
 
       if (error) {
         throw error;
@@ -703,6 +823,27 @@ export default function SuperAdminPage() {
     return teams.find((team) => team.id === teamId)?.name ?? "Unknown team";
   };
 
+  const strategyRosterByTeam = useMemo(() => {
+    const playerById = new Map(players.map((player) => [player.id, player]));
+    const grouped = new Map<string, Player[]>();
+
+    strategyPicks.forEach((pick) => {
+      const player = playerById.get(pick.player_id);
+      if (!player) {
+        return;
+      }
+
+      const nextPlayers = grouped.get(pick.team_code) ?? [];
+      nextPlayers.push(player);
+      grouped.set(pick.team_code, nextPlayers);
+    });
+
+    return teams.map((team) => ({
+      team,
+      players: grouped.get(team.franchise_code) ?? [],
+    }));
+  }, [players, strategyPicks, teams]);
+
   return (
     <main className="min-h-screen bg-slate-100 p-4 text-slate-900">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
@@ -740,6 +881,20 @@ export default function SuperAdminPage() {
             <div className="grid gap-3">
               <div className="flex flex-wrap gap-3">
                 <ActionButton
+                  variant="purple"
+                  disabled={isBusy || !auctionState}
+                  onClick={handleStartRoundThree}
+                >
+                  Start Round 3
+                </ActionButton>
+                <ActionButton
+                  variant="blue"
+                  disabled={isBusy || !auctionState}
+                  onClick={handleSwitchToRoundTwo}
+                >
+                  Switch to Round 2
+                </ActionButton>
+                <ActionButton
                   variant="green"
                   disabled={isBusy || !auctionState}
                   onClick={handleStartAuction}
@@ -761,6 +916,7 @@ export default function SuperAdminPage() {
                   Reset Auction
                 </ActionButton>
               </div>
+
               <label className="grid gap-2 text-sm font-semibold">
                 Override Bid
                 <input
@@ -774,6 +930,7 @@ export default function SuperAdminPage() {
                   className="rounded-xl border border-slate-300 p-3 font-normal shadow-sm"
                 />
               </label>
+
               <label className="grid gap-2 text-sm font-semibold">
                 Override Leading Team
                 <select
@@ -790,6 +947,7 @@ export default function SuperAdminPage() {
                   ))}
                 </select>
               </label>
+
               <div className="flex flex-wrap gap-3">
                 <ActionButton
                   variant="purple"
@@ -842,6 +1000,42 @@ export default function SuperAdminPage() {
                   {auctionState?.status ?? "No state"}
                 </p>
               </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-sm text-slate-500">Auction Round</p>
+                <p className="text-lg font-bold">
+                  Round {auctionState?.auction_round ?? 2}
+                </p>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Strategy Picks">
+            <div className="grid gap-3 max-h-[28rem] overflow-y-auto pr-1">
+              {strategyRosterByTeam.map(({ team, players: strategyPlayers }) => (
+                <article key={team.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.28em] text-slate-500">{team.franchise_code}</p>
+                      <h3 className="text-base font-bold text-slate-900">{team.name}</h3>
+                    </div>
+                    <strong className="text-sm text-slate-700">{strategyPlayers.length}/2 locked</strong>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {strategyPlayers.length ? (
+                      strategyPlayers.map((player) => (
+                        <span
+                          key={player.id}
+                          className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-900"
+                        >
+                          {player.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-500">No strategy players saved yet.</span>
+                    )}
+                  </div>
+                </article>
+              ))}
             </div>
           </Section>
 

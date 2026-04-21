@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PlayerCard from "@/components/PlayerCard";
 import { FRANCHISE_BY_CODE, type FranchiseCode } from "@/lib/franchises";
-import { mapAuctionStateRow, mapPlayerRow } from "@/lib/auctionUtils";
+import { mapAuctionStateRow } from "@/lib/auctionUtils";
 import { supabase } from "@/lib/supabase-client";
+import { mapPlayersForAuctionRound } from "@/services/supabase";
 import type { AuctionStateRow, AuctionStatus, Player, PlayerRow } from "@/types/player";
 
 type TeamRow = {
@@ -17,7 +18,12 @@ type TeamRow = {
   spent_lakhs: number;
   roster_count: number;
   is_blocked: boolean;
+  round3_qualified?: boolean;
 };
+
+const TEAM_SIZE_CAP = 11;
+const TEAM_PURSE_CAP_LAKHS = 10000; // 100 Cr
+const BID_INCREMENT_LAKHS = 50;
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : "Unable to load the live auction feed.";
@@ -31,25 +37,19 @@ const formatCr = (amountInLakhs: number): string => {
   return `Rs ${amountInLakhs} L`;
 };
 
-const sortPlayers = (players: Player[]): Player[] => {
-  return [...players].sort((leftPlayer, rightPlayer) => {
-    if (leftPlayer.slNo !== null && rightPlayer.slNo !== null) {
-      return leftPlayer.slNo - rightPlayer.slNo;
-    }
-
-    if (leftPlayer.slNo !== null) return -1;
-    if (rightPlayer.slNo !== null) return 1;
-    return leftPlayer.name.localeCompare(rightPlayer.name);
-  });
-};
-
 type WinAnnouncement = {
   playerId: string;
   playerName: string;
   amountLakhs: number;
+  imageUrl: string;
+};
+
+type RoundTransitionModal = {
+  qualified: boolean;
 };
 
 function FranchiseLiveAuctionContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const teamCodeFromQuery = searchParams.get("team") as FranchiseCode | null;
   const franchise = teamCodeFromQuery ? FRANCHISE_BY_CODE[teamCodeFromQuery] : null;
@@ -64,10 +64,12 @@ function FranchiseLiveAuctionContent() {
   const [bidFeed, setBidFeed] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [winAnnouncement, setWinAnnouncement] = useState<WinAnnouncement | null>(null);
+  const [roundTransitionModal, setRoundTransitionModal] = useState<RoundTransitionModal | null>(null);
 
   const previousAssignmentsRef = useRef<Map<string, string | null>>(new Map());
   const hasHydratedRef = useRef(false);
   const lastWinAnnouncementKeyRef = useRef("");
+  const previousRoundRef = useRef<number | null>(null);
 
   const currentPlayer = useMemo(
     () => players.find((player) => player.id === auctionState?.current_player_id) ?? null,
@@ -80,15 +82,40 @@ function FranchiseLiveAuctionContent() {
   );
 
   const availablePlayers = useMemo(
-    () => sortPlayers(players.filter((player) => !player.assignedFranchiseCode)),
+    () => players.filter((player) => !player.assignedFranchiseCode),
     [players],
   );
 
   const baseBidLakhs = currentPlayer?.basePriceLakhs ?? 0;
   const liveBidLakhs = auctionState?.current_bid ?? 0;
   const minimumNextBidLakhs = useMemo(() => {
-    return Math.max(baseBidLakhs, liveBidLakhs + 5);
+    return Math.max(baseBidLakhs, liveBidLakhs + BID_INCREMENT_LAKHS);
   }, [baseBidLakhs, liveBidLakhs]);
+
+  const auctionRound = auctionState?.auction_round ?? 2;
+  const isRoundThree = auctionRound === 3;
+  const isRoundThreeQualified = Boolean(teamRow?.round3_qualified);
+  const isAuctionStarted = auctionState?.status === "bidding";
+  const isTeamFull = (teamRow?.roster_count ?? 0) >= TEAM_SIZE_CAP;
+  const teamSpent = teamRow?.spent_lakhs ?? 0;
+  const teamBudget = TEAM_PURSE_CAP_LAKHS;
+  const teamRemainingPurse = Math.max(teamBudget - teamSpent, 0);
+  const isFundsExhausted = teamRemainingPurse <= 0;
+  const hasInsufficientFundsForNextBid = teamRemainingPurse < minimumNextBidLakhs;
+  const teamRemainingDisplay = teamRemainingPurse;
+
+  const bidBlockReason = useMemo(() => {
+    if (!currentPlayer) return "Cannot place a bid because there is no active player.";
+    if (!isAuctionStarted) return "Bidding has not started yet. Waiting for auctioneer.";
+    if (isRoundThree && !isRoundThreeQualified) return "Your franchise did not qualify for Round 3 bidding.";
+    if (teamRow?.is_blocked) return "Your franchise is currently blocked from bidding.";
+    if (isTeamFull) return `Squad full. Maximum ${TEAM_SIZE_CAP} players allowed.`;
+    if (isFundsExhausted) return "You have exhausted your funds. Go back and manage your team.";
+    if (hasInsufficientFundsForNextBid) return "Insufficient purse for the next valid bid.";
+    return "";
+  }, [currentPlayer, hasInsufficientFundsForNextBid, isAuctionStarted, isFundsExhausted, isRoundThree, isRoundThreeQualified, isTeamFull, teamRow?.is_blocked]);
+
+  const isBidActionDisabled = isSubmittingBid || Boolean(bidBlockReason);
 
   const cardPlayer = useMemo(() => {
     if (!currentPlayer) {
@@ -118,9 +145,12 @@ function FranchiseLiveAuctionContent() {
         if (teamsError) throw teamsError;
         if (stateError) throw stateError;
 
-        const nextPlayers = sortPlayers(((playersData ?? []) as PlayerRow[]).map((row) => mapPlayerRow(row)));
         const nextTeams = (teamsData ?? []) as TeamRow[];
         const nextAuctionState = stateData ? mapAuctionStateRow(stateData as Record<string, unknown>) : null;
+        const nextPlayers = mapPlayersForAuctionRound(
+          (playersData ?? []) as PlayerRow[],
+          nextAuctionState?.auction_round ?? 2,
+        );
 
         if (!isMounted) {
           return;
@@ -139,6 +169,7 @@ function FranchiseLiveAuctionContent() {
               playerName: wonPlayer.name,
               amountLakhs:
                 wonPlayer.currentBidLakhs || nextAuctionState?.current_winning_bid_lakhs || nextAuctionState?.current_bid || 0,
+              imageUrl: wonPlayer.imageUrl,
             });
           }
         }
@@ -166,6 +197,11 @@ function FranchiseLiveAuctionContent() {
 
     void loadData();
 
+    // Poll every 1 second to keep auction live
+    const intervalId = setInterval(() => {
+      void loadData();
+    }, 1000);
+
     const channel = supabase
       .channel("franchise_live_auction")
       .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => {
@@ -181,6 +217,7 @@ function FranchiseLiveAuctionContent() {
 
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
       void supabase.removeChannel(channel);
     };
   }, []);
@@ -221,6 +258,38 @@ function FranchiseLiveAuctionContent() {
     };
   }, [winAnnouncement]);
 
+  useEffect(() => {
+    if (!franchise) {
+      return;
+    }
+
+    if (previousRoundRef.current === null) {
+      previousRoundRef.current = auctionRound;
+      return;
+    }
+
+    const previousRound = previousRoundRef.current;
+
+    if (previousRound !== auctionRound && auctionRound === 3) {
+      // Only show modal if we haven't shown it for this round transition
+      const modalShownKey = `round3_modal_shown_${franchise.code}`;
+      const hasShownModal = sessionStorage.getItem(modalShownKey) === "true";
+
+      if (!hasShownModal) {
+        setRoundTransitionModal({ qualified: isRoundThreeQualified });
+        sessionStorage.setItem(modalShownKey, "true");
+      }
+    }
+
+    // Clear the session flag when transitioning back to round 2
+    if (previousRound === 3 && auctionRound === 2) {
+      const modalShownKey = `round3_modal_shown_${franchise.code}`;
+      sessionStorage.removeItem(modalShownKey);
+    }
+
+    previousRoundRef.current = auctionRound;
+  }, [auctionRound, franchise, isRoundThreeQualified]);
+
   const applyBidDelta = (deltaLakhs: number) => {
     setDraftBidLakhs((previous) => {
       const nextValue = previous + deltaLakhs;
@@ -234,8 +303,8 @@ function FranchiseLiveAuctionContent() {
       return;
     }
 
-    if (teamRow?.is_blocked) {
-      setErrorMessage("Your franchise is currently blocked from bidding.");
+    if (bidBlockReason) {
+      setErrorMessage(bidBlockReason);
       return;
     }
 
@@ -320,7 +389,10 @@ function FranchiseLiveAuctionContent() {
     <main className="dashboard-shell live-auction-shell h-screen w-full overflow-hidden" style={{ maxWidth: "100%" }}>
       <header className="auth-topbar">
         <span className="logo-text">●●● Cricket Auction Arena</span>
-        <span className="badge subtle">{franchise.name}</span>
+        <span className="badge subtle">
+          {franchise.name} • Round {auctionRound}
+          {isRoundThree ? (isRoundThreeQualified ? " • Qualified" : " • Not Qualified") : ""}
+        </span>
         <div className="topbar-right">
           <Link href={`/franchise/dashboard?team=${franchise.code}`} className="ghost-button">
             Back
@@ -373,48 +445,53 @@ function FranchiseLiveAuctionContent() {
                   <button
                     type="button"
                     className="ghost-button h-10 min-h-0"
-                    onClick={() => applyBidDelta(-5)}
-                    disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                    onClick={() => applyBidDelta(-BID_INCREMENT_LAKHS)}
+                    disabled={isBidActionDisabled}
                   >
-                    -5 L
+                    -50 L
                   </button>
                   <input
                     type="number"
                     min={minimumNextBidLakhs}
-                    step={5}
+                    step={BID_INCREMENT_LAKHS}
                     value={draftBidLakhs}
                     onChange={(event) => setDraftBidLakhs(Math.max(minimumNextBidLakhs, Number(event.target.value) || minimumNextBidLakhs))}
                     onKeyDown={handleBidInputKeyDown}
                     className="h-10 w-full rounded-[0.7rem] border-[3px] border-[#111111] bg-white px-2 text-center text-base font-black"
-                    disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                    disabled={isBidActionDisabled}
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       className="ghost-button h-10 min-h-0"
-                      onClick={() => applyBidDelta(5)}
-                      disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                      onClick={() => applyBidDelta(BID_INCREMENT_LAKHS)}
+                      disabled={isBidActionDisabled}
                     >
-                      +5 L
+                      +50 L
                     </button>
                     <button
                       type="button"
                       className="ghost-button h-10 min-h-0"
-                      onClick={() => applyBidDelta(10)}
-                      disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                      onClick={() => applyBidDelta(100)}
+                      disabled={isBidActionDisabled}
                     >
-                      +10 L
+                      +1 Cr
                     </button>
                   </div>
                 </div>
                 <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[#666]">Minimum next bid: {formatCr(minimumNextBidLakhs)} • Press Enter to place</p>
+                {bidBlockReason ? (
+                  <p className="mt-2 rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-rose-700">
+                    {bidBlockReason}
+                  </p>
+                ) : null}
               </div>
 
               <button
                 type="button"
                 className="primary-button w-full"
                 onClick={() => void placeBid()}
-                disabled={isSubmittingBid || !currentPlayer || teamRow?.is_blocked}
+                disabled={isBidActionDisabled}
               >
                 {isSubmittingBid ? "Placing Bid..." : `Place Bid ${formatCr(draftBidLakhs)}`}
               </button>
@@ -434,7 +511,7 @@ function FranchiseLiveAuctionContent() {
               </article>
               <article className="rounded-[0.8rem] border-[3px] border-[#111111] bg-[#fffdf7] p-2">
                 <p className="text-[0.62rem] uppercase tracking-[0.18em] text-[#666]">Remaining</p>
-                <strong>{formatCr(teamRow?.purse_lakhs ?? 1000)}</strong>
+                <strong>{formatCr(teamRemainingDisplay)}</strong>
               </article>
             </div>
           </section>
@@ -477,11 +554,52 @@ function FranchiseLiveAuctionContent() {
         <div className="franchise-win-overlay" role="dialog" aria-modal="true" aria-labelledby="franchise-win-title">
           <section className="franchise-win-modal">
             <p className="franchise-win-kicker">Congratulations</p>
+            
+            <div className="franchise-win-player-image-container">
+              <div className="franchise-win-player-glow" />
+              {winAnnouncement.imageUrl ? (
+                <img 
+                  src={winAnnouncement.imageUrl} 
+                  alt={winAnnouncement.playerName}
+                  className="franchise-win-player-image"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      const fallback = parent.querySelector("[data-win-fallback]") as HTMLElement | null;
+                      if (fallback) fallback.style.display = "flex";
+                    }
+                  }}
+                />
+              ) : null}
+              <div
+                data-win-fallback=""
+                style={{
+                  display: winAnnouncement.imageUrl ? "none" : "flex",
+                  position: "absolute",
+                  inset: 0,
+                  fontSize: "3.5rem",
+                  fontWeight: "700",
+                  color: "#ffffff",
+                  textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+                  lineHeight: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: "rgba(200, 163, 79, 0.3)",
+                  borderRadius: "1rem",
+                }}
+              >
+                {winAnnouncement.playerName?.charAt(0)?.toUpperCase() ?? "?"}
+              </div>
+            </div>
+            
             <h2 id="franchise-win-title">You won the bid for {winAnnouncement.playerName}</h2>
-            <p>
+            <p className="franchise-win-amount">
               Final winning bid: <strong>{formatCr(winAnnouncement.amountLakhs)}</strong>
             </p>
-            <p>
+            <p className="franchise-win-description">
               This player has been added to your team section. Open your dashboard to review your full squad.
             </p>
             <div className="franchise-win-actions">
@@ -490,6 +608,44 @@ function FranchiseLiveAuctionContent() {
               </Link>
               <button type="button" className="ghost-button" onClick={() => setWinAnnouncement(null)}>
                 Continue Bidding
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {roundTransitionModal ? (
+        <div className="franchise-win-overlay" role="dialog" aria-modal="true" aria-labelledby="round-transition-title">
+          <section className="franchise-win-modal">
+            <p className="franchise-win-kicker">Round Update</p>
+            <h2 id="round-transition-title">
+              {roundTransitionModal.qualified ? "Congratulations, you are up to the next round" : "Round 3 has started"}
+            </h2>
+            {roundTransitionModal.qualified ? (
+              <>
+                <p>Your strategy players are kept back in your team.</p>
+                <p>You have to start the bidding for the remaining players. Continue to your squad board to see those retained strategy players while all other previous players are removed.</p>
+              </>
+            ) : (
+              <p>Only top 5 teams proceed to Round 3. Your team is not qualified for Round 3 bidding.</p>
+            )}
+            <div className="franchise-win-actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  setRoundTransitionModal(null);
+                  router.push(`/franchise/dashboard?team=${encodeURIComponent(franchise.code)}`);
+                }}
+              >
+                Go To Squad
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setRoundTransitionModal(null)}
+              >
+                Stay Here
               </button>
             </div>
           </section>
