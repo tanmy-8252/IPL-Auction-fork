@@ -122,16 +122,16 @@ const IPL_COLOR_THEME: Record<FranchiseCode, { base: string; text: "white" | "bl
 };
 
 const themeByFranchise: Record<FranchiseCode, { accent: string; accentSoft: string; surface: string; border: string; text: string; mutedText: string }> = {
-  CSK: { accent: "#ffd200", accentSoft: "#fff0a8", surface: "#fffbe6", border: "#d4b12a", text: "#1e2f57", mutedText: "#6f6529" },
-  MI: { accent: "#0a2a66", accentSoft: "#c7d8ff", surface: "#f3f8ff", border: "#16408e", text: "#0a2a66", mutedText: "#4a5d84" },
-  RCB: { accent: "#ff1a1a", accentSoft: "#ffd1d1", surface: "#fff2f2", border: "#b70f0f", text: "#111111", mutedText: "#7a2323" },
-  KKR: { accent: "#5b2da3", accentSoft: "#ead8ff", surface: "#faf5ff", border: "#7b47c7", text: "#24103f", mutedText: "#694f8e" },
-  SRH: { accent: "#ff7a00", accentSoft: "#ffe0bf", surface: "#fff8ef", border: "#c55c00", text: "#411700", mutedText: "#82512b" },
-  RR: { accent: "#ff8fb2", accentSoft: "#ffe2eb", surface: "#fff8fb", border: "#ce6e8e", text: "#5f1734", mutedText: "#8a5670" },
-  PBKS: { accent: "#d71920", accentSoft: "#ffd0d0", surface: "#fff4f4", border: "#a61a1f", text: "#52050a", mutedText: "#7c3a3d" },
-  DC: { accent: "#1d4ed8", accentSoft: "#dbe7ff", surface: "#f4f8ff", border: "#2c65e3", text: "#12316b", mutedText: "#52648f" },
-  LSG: { accent: "#0b5fa5", accentSoft: "#cde9ff", surface: "#f4fbff", border: "#1672c2", text: "#0b355b", mutedText: "#4d6a84" },
-  GT: { accent: "#c9a74e", accentSoft: "#f4e4bb", surface: "#fffaf0", border: "#93752f", text: "#2b2616", mutedText: "#6d5c34" },
+  CSK: { accent: "#ffd200", accentSoft: "#fff5c2", surface: "#1a2438", border: "#d4b12a", text: "#fff8d2", mutedText: "#e9db9e" },
+  MI: { accent: "#0a2a66", accentSoft: "#c7d8ff", surface: "#111f38", border: "#16408e", text: "#dfe9ff", mutedText: "#b7c8e9" },
+  RCB: { accent: "#ff1a1a", accentSoft: "#ffd1d1", surface: "#2a1618", border: "#b70f0f", text: "#ffe4e4", mutedText: "#f0b7bc" },
+  KKR: { accent: "#5b2da3", accentSoft: "#ead8ff", surface: "#241b36", border: "#7b47c7", text: "#f0e6ff", mutedText: "#cdb8eb" },
+  SRH: { accent: "#ff7a00", accentSoft: "#ffe0bf", surface: "#2d1c13", border: "#c55c00", text: "#ffe7cf", mutedText: "#f0c89f" },
+  RR: { accent: "#ff8fb2", accentSoft: "#ffe2eb", surface: "#2d1a34", border: "#ce6e8e", text: "#ffe5f1", mutedText: "#edbdd1" },
+  PBKS: { accent: "#d71920", accentSoft: "#ffd0d0", surface: "#2c1419", border: "#a61a1f", text: "#ffe6e8", mutedText: "#efbcc1" },
+  DC: { accent: "#1d4ed8", accentSoft: "#dbe7ff", surface: "#14233e", border: "#2c65e3", text: "#e5efff", mutedText: "#b8c9ea" },
+  LSG: { accent: "#0b5fa5", accentSoft: "#cde9ff", surface: "#251a38", border: "#1672c2", text: "#f5e6ff", mutedText: "#cbb7e5" },
+  GT: { accent: "#c9a74e", accentSoft: "#f4e4bb", surface: "#162235", border: "#93752f", text: "#e6edf8", mutedText: "#bac7da" },
 };
 
 const getFranchiseTheme = (code: FranchiseCode) => themeByFranchise[code];
@@ -705,6 +705,29 @@ function FranchiseDashboardContent() {
   const bannerColor2 = "#000000";
   const teamTextColor = teamBrand.text === "black" ? "#111111" : "#ffffff";
 
+  const boardStyle = {
+    background: `linear-gradient(165deg, ${theme.surface}, color-mix(in srgb, ${theme.surface} 76%, #0d121a))`,
+    borderColor: theme.border,
+    color: theme.text,
+  };
+
+  const panelStyle = {
+    background: `linear-gradient(160deg, color-mix(in srgb, ${theme.surface} 92%, #101620), color-mix(in srgb, ${theme.surface} 78%, #0f141d))`,
+    borderColor: `color-mix(in srgb, ${theme.border} 62%, #1b1b1b)`,
+    color: theme.text,
+  };
+
+  const panelSoftStyle = {
+    background: `linear-gradient(160deg, color-mix(in srgb, ${theme.surface} 86%, #0d121a), color-mix(in srgb, ${theme.surface} 70%, #0b0f16))`,
+    borderColor: `color-mix(in srgb, ${theme.accentSoft} 40%, #1b1b1b)`,
+    color: theme.text,
+  };
+
+  const topbarStyle = {
+    background: `linear-gradient(135deg, color-mix(in srgb, ${bannerColor1} 62%, #0f141d), color-mix(in srgb, ${theme.surface} 66%, #0f141d))`,
+    borderColor: `color-mix(in srgb, ${theme.accentSoft} 38%, #1b1b1b)`,
+  };
+
   const toggleStrategyPlayer = (playerId: string) => {
     setSelectedStrategyIds((currentIds) => {
       if (currentIds.includes(playerId)) {
@@ -806,7 +829,8 @@ function FranchiseDashboardContent() {
         {/* Top Bar Wrapper */}
         <div className="w-[95%] max-w-[1600px] mt-1 ml-2 sm:mt-3 sm:ml-0 flex-shrink-0">
           <div className="auth-topbar glass-override" style={{
-            marginBottom: "0"
+            marginBottom: "0",
+            ...topbarStyle,
           }}>
             <div className="flex items-center gap-4">
               <span className="text-white/90 text-xl font-semibold tracking-wide drop-shadow-md">
@@ -814,7 +838,10 @@ function FranchiseDashboardContent() {
               </span>
             </div>
             <div className="topbar-right">
-              <Link href="/franchise/login" className="flex items-center justify-center bg-white/10 border border-white/20 rounded-xl px-6 py-2 shadow-md group cursor-pointer hover:bg-white/20 transition-all">
+              <Link href="/franchise/login" className="flex items-center justify-center border rounded-xl px-6 py-2 shadow-md group cursor-pointer hover:bg-white/20 transition-all" style={{
+                background: "rgba(255,255,255,0.12)",
+                borderColor: "rgba(255,255,255,0.35)",
+              }}>
                 <div className="relative overflow-hidden w-[220px] h-6 flex items-center justify-center">
                   <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-white transition-all duration-300 group-hover:-translate-y-6 group-hover:opacity-0">
                     {franchise.name}
@@ -831,7 +858,7 @@ function FranchiseDashboardContent() {
         <main className="w-[95%] max-w-[1600px] mt-1 ml-2 sm:mt-3 sm:ml-0 flex-grow flex flex-col gap-3 min-h-0 overflow-hidden mb-3">
           {errorMessage ? <section className="dashboard-card dashboard-card--wide">{errorMessage}</section> : null}
 
-          <section className="franchise-team-board glass-override h-full flex flex-col min-h-0 overflow-hidden">
+          <section className="franchise-team-board glass-override h-full flex flex-col min-h-0 overflow-hidden" style={boardStyle}>
 
             <div className="w-full rounded-2xl overflow-hidden mb-3 flex-shrink-0" style={{
               background: `linear-gradient(to right, ${bannerColor1}, ${bannerColor2})`,
@@ -861,22 +888,25 @@ function FranchiseDashboardContent() {
                 <div className="flex flex-col h-full justify-between items-start pl-8">
                   {/* Budget Row */}
                   <div className="grid grid-cols-4 gap-4 w-full">
-                    <article className="w-full bg-white/10 rounded-xl py-4 text-white text-center">
+                    <article className="w-full rounded-xl py-4 text-white text-center border" style={panelStyle}>
                       <p className="text-sm font-medium uppercase tracking-wider text-white/70">Total Budget</p>
                       <p className="text-lg font-bold mt-1">{formatCr(teamBudget)}</p>
                     </article>
 
-                    <article className="w-full bg-white/10 rounded-xl py-4 text-white text-center">
+                    <article className="w-full rounded-xl py-4 text-white text-center border" style={panelStyle}>
                       <p className="text-sm font-medium uppercase tracking-wider text-white/70">Spent</p>
                       <p className="text-lg font-bold mt-1">{formatCr(teamSpent)}</p>
                     </article>
 
-                    <article className="w-full bg-white/10 rounded-xl py-4 text-white text-center">
+                    <article className="w-full rounded-xl py-4 text-white text-center border" style={panelStyle}>
                       <p className="text-sm font-medium uppercase tracking-wider text-white/70">Remaining</p>
                       <p className="text-lg font-bold mt-1">{formatCr(teamRemaining)}</p>
                     </article>
 
-                    <article className="w-full bg-amber-500/20 rounded-xl py-4 text-amber-100 text-center border border-amber-400/30">
+                    <article className="w-full rounded-xl py-4 text-amber-100 text-center border" style={{
+                      background: `linear-gradient(140deg, color-mix(in srgb, ${theme.accent} 22%, transparent), color-mix(in srgb, ${theme.surface} 84%, #0f141d))`,
+                      borderColor: `color-mix(in srgb, ${theme.accentSoft} 40%, #1b1b1b)`,
+                    }}>
                       <p className="text-sm font-medium uppercase tracking-wider text-amber-200/70">Team Credits</p>
                       <p className="text-lg font-bold mt-1">{teamTotalCredits} pts</p>
                     </article>
@@ -931,7 +961,7 @@ function FranchiseDashboardContent() {
               <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr] gap-6 px-4 flex-1 min-h-0 overflow-visible items-stretch">
 
                 {/* LEFT: Strategy Picks (25%) */}
-                <div className="rounded-xl p-4 bg-white/10 border border-white/10 flex flex-col gap-4">
+                <div className="rounded-xl p-4 border flex flex-col gap-4" style={panelStyle}>
                   {/* Title only */}
                   <p
                     className="text-xs font-bold uppercase tracking-widest"
@@ -974,7 +1004,7 @@ function FranchiseDashboardContent() {
                 </div>
 
                 {/* CENTER: Squad Player Cards — excludes already-selected players (50%) */}
-                <div className="rounded-xl p-4 bg-white/10 border border-white/10 overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-hide">
+                <div className="rounded-xl p-4 border overflow-y-auto max-h-[calc(100vh-280px)] scrollbar-hide" style={panelStyle}>
                   <section className="grid grid-cols-2 gap-4 overflow-visible" aria-label="Strategy player selection">
                     {activePlayerList
                       .filter((p) => !selectedStrategyIds.includes(p.id))
@@ -995,7 +1025,7 @@ function FranchiseDashboardContent() {
                 </div>
 
                 {/* RIGHT: Live Auction State (25%) */}
-                <div className="rounded-xl p-4 bg-white/10 border border-white/10 flex flex-col gap-3">
+                <div className="rounded-xl p-4 border flex flex-col gap-3" style={panelStyle}>
                   <h2 className="text-xl font-black">Live Auction State</h2>
                   <p className="text-sm text-[#d4ddef]">Current Player: <span className="text-white font-semibold">{auctionState?.current_player_id ?? "None"}</span></p>
                   <p className="text-sm text-[#d4ddef]">Current Bid: <span className="text-white font-semibold">{formatCr(auctionState?.current_bid ?? 0)}</span></p>
@@ -1009,7 +1039,7 @@ function FranchiseDashboardContent() {
             {viewMode !== "strategy" ? (
               <div className="px-4 pt-3 pb-6 h-[calc(100vh-220px)] overflow-y-auto overflow-x-hidden scrollbar-hide" style={{ borderRadius: "0.5rem" }}>
                 {viewMode === "market" ? (
-                  <div className="mb-4 rounded-xl border border-white/15 bg-black/25 p-3">
+                  <div className="mb-4 rounded-xl border p-3" style={panelSoftStyle}>
                     <div className="grid grid-cols-1 gap-3 lg:grid-cols-[2fr_1fr_1fr_1fr]">
                       <input
                         type="text"

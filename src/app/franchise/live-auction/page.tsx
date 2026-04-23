@@ -25,6 +25,27 @@ const TEAM_SIZE_CAP = 11;
 const TEAM_PURSE_CAP_LAKHS = 10000; // 100 Cr
 const BID_INCREMENT_LAKHS = 50;
 
+const LIVE_ARENA_THEME: Record<FranchiseCode, {
+  primary: string;
+  secondary: string;
+  accent: string;
+  accentSoft: string;
+  surface: string;
+  surfaceAlt: string;
+  ink: string;
+}> = {
+  CSK: { primary: "#f5d400", secondary: "#0c2d62", accent: "#ffe37a", accentSoft: "#fff5c2", surface: "#1a2438", surfaceAlt: "#263454", ink: "#fff8d2" },
+  MI: { primary: "#004ba8", secondary: "#0a1f4d", accent: "#d4af37", accentSoft: "#f5de8f", surface: "#111f38", surfaceAlt: "#1b2e52", ink: "#dfe9ff" },
+  RCB: { primary: "#d71920", secondary: "#171214", accent: "#d4af37", accentSoft: "#f3dd9c", surface: "#2a1618", surfaceAlt: "#3a1d20", ink: "#ffe4e4" },
+  KKR: { primary: "#5d2d91", secondary: "#281544", accent: "#d4af37", accentSoft: "#f2df9d", surface: "#241b36", surfaceAlt: "#33224b", ink: "#f0e6ff" },
+  SRH: { primary: "#f26a21", secondary: "#7a2f00", accent: "#ffd447", accentSoft: "#ffe8ad", surface: "#2d1c13", surfaceAlt: "#3f2418", ink: "#ffe7cf" },
+  RR: { primary: "#ff2f92", secondary: "#123d9a", accent: "#d4af37", accentSoft: "#f6dd98", surface: "#2d1a34", surfaceAlt: "#382045", ink: "#ffe5f1" },
+  PBKS: { primary: "#c8102e", secondary: "#4a0912", accent: "#d4af37", accentSoft: "#f0d68e", surface: "#2c1419", surfaceAlt: "#3b1a20", ink: "#ffe6e8" },
+  DC: { primary: "#0078d4", secondary: "#0e2a66", accent: "#e63946", accentSoft: "#ffc1c8", surface: "#14233e", surfaceAlt: "#1e3050", ink: "#e5efff" },
+  LSG: { primary: "#a1186a", secondary: "#172b65", accent: "#d4af37", accentSoft: "#f3dd95", surface: "#251a38", surfaceAlt: "#30214a", ink: "#f5e6ff" },
+  GT: { primary: "#0b2344", secondary: "#111827", accent: "#caa65b", accentSoft: "#ecd8a0", surface: "#162235", surfaceAlt: "#1f2d42", ink: "#e6edf8" },
+};
+
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : "Unable to load the live auction feed.";
 };
@@ -103,6 +124,25 @@ function FranchiseLiveAuctionContent() {
   const isFundsExhausted = teamRemainingPurse <= 0;
   const hasInsufficientFundsForNextBid = teamRemainingPurse < minimumNextBidLakhs;
   const teamRemainingDisplay = teamRemainingPurse;
+  const liveTheme = franchise ? LIVE_ARENA_THEME[franchise.code] : LIVE_ARENA_THEME.CSK;
+
+  const arenaSurfaceStyle = {
+    background: `linear-gradient(145deg, color-mix(in srgb, ${liveTheme.primary} 38%, #0d1622), color-mix(in srgb, ${liveTheme.secondary} 74%, #0b111a))`,
+    borderColor: `color-mix(in srgb, ${liveTheme.secondary} 45%, #111111)`,
+    color: liveTheme.ink,
+  };
+
+  const panelStyle = {
+    background: `linear-gradient(160deg, ${liveTheme.surface}, ${liveTheme.surfaceAlt})`,
+    borderColor: `color-mix(in srgb, ${liveTheme.secondary} 42%, #111111)`,
+    color: liveTheme.ink,
+  };
+
+  const panelSubtleStyle = {
+    background: `linear-gradient(150deg, color-mix(in srgb, ${liveTheme.surface} 86%, #0d121a), color-mix(in srgb, ${liveTheme.surfaceAlt} 88%, #0b1016))`,
+    borderColor: `color-mix(in srgb, ${liveTheme.accent} 30%, #111111)`,
+    color: liveTheme.ink,
+  };
 
   const bidBlockReason = useMemo(() => {
     if (!currentPlayer) return "Cannot place a bid because there is no active player.";
@@ -388,18 +428,32 @@ function FranchiseLiveAuctionContent() {
   }
 
   return (
-    <main className="dashboard-shell live-auction-shell h-screen w-full overflow-hidden" style={{ maxWidth: "100%" }}>
-      <header className="auth-topbar">
-        <span className="logo-text">●●● Cricket Auction Arena</span>
-        <span className="badge subtle">
+    <main
+      className="dashboard-shell live-auction-shell min-h-screen w-full overflow-x-hidden overflow-y-auto flex flex-col"
+      style={{
+        maxWidth: "100%",
+        background:
+          `radial-gradient(circle at 16% 8%, color-mix(in srgb, ${liveTheme.accent} 18%, transparent), transparent 35%), radial-gradient(circle at 84% 16%, color-mix(in srgb, ${liveTheme.primary} 14%, transparent), transparent 34%)`,
+      }}
+    >
+      <header
+        className="auth-topbar sticky top-0 z-30"
+        style={{
+          background: `linear-gradient(135deg, color-mix(in srgb, ${liveTheme.secondary} 86%, #ffffff), color-mix(in srgb, ${liveTheme.primary} 72%, #ffffff))`,
+          borderColor: `color-mix(in srgb, ${liveTheme.accent} 40%, #111111)`,
+          color: "#ffffff",
+        }}
+      >
+        <span className="logo-text" style={{ color: liveTheme.accentSoft }}>●●● Cricket Auction Arena</span>
+        <span className="text-sm font-semibold tracking-[0.06em]" style={{ color: "#ffffff" }}>
           {franchise.name} • Round {auctionRound}
           {isRoundThree ? (isRoundThreeQualified ? " • Qualified" : " • Not Qualified") : ""}
         </span>
         <div className="topbar-right">
-          <Link href={`/franchise/dashboard?team=${franchise.code}`} className="ghost-button">
+          <Link href={`/franchise/dashboard?team=${franchise.code}`} className="ghost-button" style={{ borderColor: liveTheme.accentSoft, color: "#ffffff", background: "rgba(255,255,255,0.08)" }}>
             Back
           </Link>
-          <Link href="/" className="ghost-button">
+          <Link href="/" className="ghost-button" style={{ borderColor: liveTheme.accentSoft, color: "#ffffff", background: "rgba(255,255,255,0.08)" }}>
             Logout
           </Link>
         </div>
@@ -408,41 +462,41 @@ function FranchiseLiveAuctionContent() {
       {errorMessage ? <section className="dashboard-card max-w-none px-4 py-3 text-left text-sm">{errorMessage}</section> : null}
       {uiNotice ? <section className="dashboard-card max-w-none px-4 py-3 text-left text-sm text-emerald-700">{uiNotice}</section> : null}
 
-      <section className="min-h-0 grid flex-1 gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(420px,0.5fr)]">
-        <article className="min-h-0 overflow-hidden rounded-[1.6rem] border-[3px] border-[#111111] bg-white p-3 shadow-[7px_7px_0_#00000024]">
+      <section className="min-h-0 grid flex-1 gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(420px,0.5fr)] px-1 pb-2 xl:overflow-hidden">
+        <article className="min-h-0 overflow-hidden rounded-[1.6rem] border-[3px] p-3 shadow-[7px_7px_0_#00000024]" style={arenaSurfaceStyle}>
           {cardPlayer ? (
-            <div className="h-full overflow-auto">
+            <div className="h-full overflow-visible xl:overflow-auto">
               <PlayerCard player={cardPlayer} className="h-full" />
             </div>
           ) : (
-            <div className="grid h-full place-items-center rounded-[1.3rem] border-[3px] border-dashed border-[#111111] bg-[#faf7ef] text-center">
+            <div className="grid h-full place-items-center rounded-[1.3rem] border-[3px] border-dashed text-center" style={panelSubtleStyle}>
               <div>
                 <h2 className="font-display text-4xl">Waiting For Auctioneer</h2>
-                <p className="mt-2 text-sm uppercase tracking-[0.2em] text-[#444]">No active lot</p>
+                <p className="mt-2 text-sm uppercase tracking-[0.2em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>No active lot</p>
               </div>
             </div>
           )}
         </article>
 
-        <aside className="min-h-0 space-y-3 overflow-hidden">
-          <section className="dashboard-card max-w-none p-4 text-left">
+        <aside className="min-h-0 w-full space-y-3 overflow-visible xl:overflow-hidden flex flex-col">
+          <section className="dashboard-card max-w-none w-full p-4 text-left" style={panelStyle}>
             <h2 className="font-display text-2xl">Live Bidding Panel</h2>
-            <p className="mt-1 text-xs uppercase tracking-[0.22em] text-[#6b6b6b]">Current lot: {currentPlayer?.name ?? "--"}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.22em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>Current lot: {currentPlayer?.name ?? "--"}</p>
 
             <div className="mt-4 grid gap-2">
               <div className="grid grid-cols-2 gap-2">
-                <article className="rounded-[0.9rem] border-[3px] border-[#111111] bg-[#fffdf7] p-2 text-center">
-                  <p className="text-[0.65rem] uppercase tracking-[0.2em] text-[#666]">Base</p>
+                <article className="rounded-[0.9rem] border-[3px] p-2 text-center" style={panelSubtleStyle}>
+                  <p className="text-[0.65rem] uppercase tracking-[0.2em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 75%, transparent)" }}>Base</p>
                   <strong className="text-lg">{formatCr(baseBidLakhs)}</strong>
                 </article>
-                <article className="rounded-[0.9rem] border-[3px] border-[#111111] bg-[#fffdf7] p-2 text-center">
-                  <p className="text-[0.65rem] uppercase tracking-[0.2em] text-[#666]">Current Bid</p>
+                <article className="rounded-[0.9rem] border-[3px] p-2 text-center" style={panelSubtleStyle}>
+                  <p className="text-[0.65rem] uppercase tracking-[0.2em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 75%, transparent)" }}>Current Bid</p>
                   <strong className="text-lg">{formatCr(liveBidLakhs)}</strong>
                 </article>
               </div>
 
-              <div className="rounded-[0.9rem] border-[3px] border-[#111111] bg-[#f8f8f8] p-3">
-                <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#666]">Your next bid</p>
+              <div className="rounded-[0.9rem] border-[3px] p-3" style={panelSubtleStyle}>
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 75%, transparent)" }}>Your next bid</p>
                 <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1.2fr_1fr]">
                   <button
                     type="button"
@@ -459,7 +513,8 @@ function FranchiseLiveAuctionContent() {
                     value={draftBidLakhs}
                     onChange={(event) => setDraftBidLakhs(Math.max(minimumNextBidLakhs, Number(event.target.value) || minimumNextBidLakhs))}
                     onKeyDown={handleBidInputKeyDown}
-                    className="h-10 w-full rounded-[0.7rem] border-[3px] border-[#111111] bg-white px-2 text-center text-base font-black"
+                    className="h-10 w-full rounded-[0.7rem] border-[3px] px-2 text-center text-base font-black"
+                    style={panelSubtleStyle}
                     disabled={isBidActionDisabled}
                   />
                   <div className="grid grid-cols-2 gap-2">
@@ -481,7 +536,7 @@ function FranchiseLiveAuctionContent() {
                     </button>
                   </div>
                 </div>
-                <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[#666]">Minimum next bid: {formatCr(minimumNextBidLakhs)} • Press Enter to place</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.16em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>Minimum next bid: {formatCr(minimumNextBidLakhs)} • Press Enter to place</p>
                 {bidBlockReason ? (
                   <p className="mt-2 rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-rose-700">
                     {bidBlockReason}
@@ -494,56 +549,57 @@ function FranchiseLiveAuctionContent() {
                 className="primary-button w-full"
                 onClick={() => void placeBid()}
                 disabled={isBidActionDisabled}
+                style={{ background: `linear-gradient(135deg, ${liveTheme.primary}, ${liveTheme.secondary})`, borderColor: liveTheme.accentSoft, color: "#ffffff" }}
               >
                 {isSubmittingBid ? "Placing Bid..." : `Place Bid ${formatCr(draftBidLakhs)}`}
               </button>
             </div>
           </section>
 
-          <section className="dashboard-card max-w-none p-4 text-left">
+          <section className="dashboard-card max-w-none w-full p-4 text-left" style={panelStyle}>
             <h2 className="font-display text-xl">Squad Snapshot</h2>
             <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-              <article className="rounded-[0.8rem] border-[3px] border-[#111111] bg-[#fffdf7] p-2">
-                <p className="text-[0.62rem] uppercase tracking-[0.18em] text-[#666]">Players</p>
+              <article className="rounded-[0.8rem] border-[3px] p-2" style={panelSubtleStyle}>
+                <p className="text-[0.62rem] uppercase tracking-[0.18em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>Players</p>
                 <strong>{teamRow?.roster_count ?? 0}</strong>
               </article>
-              <article className="rounded-[0.8rem] border-[3px] border-[#111111] bg-[#fffdf7] p-2">
-                <p className="text-[0.62rem] uppercase tracking-[0.18em] text-[#666]">Spent</p>
+              <article className="rounded-[0.8rem] border-[3px] p-2" style={panelSubtleStyle}>
+                <p className="text-[0.62rem] uppercase tracking-[0.18em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>Spent</p>
                 <strong>{formatCr(teamRow?.spent_lakhs ?? 0)}</strong>
               </article>
-              <article className="rounded-[0.8rem] border-[3px] border-[#111111] bg-[#fffdf7] p-2">
-                <p className="text-[0.62rem] uppercase tracking-[0.18em] text-[#666]">Remaining</p>
+              <article className="rounded-[0.8rem] border-[3px] p-2" style={panelSubtleStyle}>
+                <p className="text-[0.62rem] uppercase tracking-[0.18em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>Remaining</p>
                 <strong>{formatCr(teamRemainingDisplay)}</strong>
               </article>
             </div>
           </section>
 
-          <section className="dashboard-card max-w-none min-h-0 flex-1 overflow-hidden p-4 text-left">
+          <section className="dashboard-card max-w-none w-full xl:min-h-0 xl:flex-1 overflow-hidden p-4 text-left" style={panelStyle}>
             <h2 className="font-display text-xl">Live Bid Feed</h2>
-            <div className="mt-3 grid max-h-[26vh] gap-2 overflow-y-auto pr-1">
+            <div className="mt-3 grid max-h-[32vh] xl:h-full xl:min-h-0 gap-2 overflow-y-auto pr-1">
               {bidFeed.length ? (
                 bidFeed.map((item) => (
-                  <p key={item} className="rounded-[0.7rem] border-[3px] border-[#111111] bg-[#fffdf7] px-3 py-2 text-xs uppercase tracking-[0.14em]">
+                  <p key={item} className="rounded-[0.7rem] border-[3px] px-3 py-2 text-xs uppercase tracking-[0.14em]" style={panelSubtleStyle}>
                     {item}
                   </p>
                 ))
               ) : (
-                <p className="text-xs uppercase tracking-[0.16em] text-[#666]">Waiting for first bid...</p>
+                <p className="text-xs uppercase tracking-[0.16em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>Waiting for first bid...</p>
               )}
             </div>
           </section>
 
-          <section className="dashboard-card max-w-none min-h-0 overflow-hidden p-4 text-left">
+          <section className="dashboard-card max-w-none w-full xl:min-h-0 xl:flex-1 overflow-hidden p-4 text-left" style={panelStyle}>
             <h2 className="font-display text-xl">Available Market</h2>
-            <div className="mt-3 grid max-h-[20vh] gap-2 overflow-y-auto pr-1">
+            <div className="mt-3 grid max-h-[32vh] xl:h-full xl:min-h-0 gap-2 overflow-y-auto pr-1">
               {availablePlayers.slice(0, 25).map((player) => (
-                <article key={player.id} className="rounded-[0.8rem] border-[3px] border-[#111111] bg-[#fffdf7] px-3 py-2">
+                <article key={player.id} className="rounded-[0.8rem] border-[3px] px-3 py-2" style={panelSubtleStyle}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-black">{player.name}</h3>
-                      <p className="mt-1 text-[0.62rem] uppercase tracking-[0.18em] text-[#666]">{player.role}</p>
+                      <p className="mt-1 text-[0.62rem] uppercase tracking-[0.18em]" style={{ color: "color-mix(in srgb, " + liveTheme.accentSoft + " 70%, transparent)" }}>{player.role}</p>
                     </div>
-                    <span className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-[#333]">{formatCr(player.basePriceLakhs)}</span>
+                    <span className="text-[0.66rem] font-bold uppercase tracking-[0.18em]" style={{ color: liveTheme.accentSoft }}>{formatCr(player.basePriceLakhs)}</span>
                   </div>
                 </article>
               ))}
@@ -554,8 +610,8 @@ function FranchiseLiveAuctionContent() {
 
       {winAnnouncement ? (
         <div className="franchise-win-overlay" role="dialog" aria-modal="true" aria-labelledby="franchise-win-title">
-          <section className="franchise-win-modal">
-            <p className="franchise-win-kicker">Congratulations</p>
+          <section className="franchise-win-modal" style={{ borderColor: liveTheme.accent, background: `linear-gradient(160deg, ${liveTheme.surface}, ${liveTheme.surfaceAlt})` }}>
+            <p className="franchise-win-kicker" style={{ color: liveTheme.primary }}>Congratulations</p>
             
             <div className="franchise-win-player-image-container">
               <div className="franchise-win-player-glow" />
