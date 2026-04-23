@@ -17,17 +17,24 @@ type FranchiseLoginArenaProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-const TEAM_THEME: Record<FranchiseCode, { accent: string; accentSoft: string }> = {
-  CSK: { accent: "#d8c758", accentSoft: "#fff3a6" },
-  MI: { accent: "#4ab0ff", accentSoft: "#d8efff" },
-  RCB: { accent: "#dd3f45", accentSoft: "#ffd6d8" },
-  KKR: { accent: "#b993ff", accentSoft: "#eee3ff" },
-  SRH: { accent: "#f47a3b", accentSoft: "#ffe1c9" },
-  RR: { accent: "#f073ad", accentSoft: "#ffdceb" },
-  PBKS: { accent: "#e94a53", accentSoft: "#ffdddd" },
-  DC: { accent: "#4d9bff", accentSoft: "#d9ebff" },
-  LSG: { accent: "#5dd4c4", accentSoft: "#d9fff7" },
-  GT: { accent: "#d1b16a", accentSoft: "#fff1c9" },
+type TeamTheme = {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+  accentSoft: string;
+};
+
+const TEAM_THEME: Record<FranchiseCode, TeamTheme> = {
+  MI: { primary: "#004ba8", secondary: "#0a1f4d", tertiary: "#d4af37", accentSoft: "#f5de8f" },
+  CSK: { primary: "#f5d400", secondary: "#0c2d62", tertiary: "#fff08e", accentSoft: "#fff6bb" },
+  KKR: { primary: "#5d2d91", secondary: "#281544", tertiary: "#d4af37", accentSoft: "#f2df9d" },
+  RCB: { primary: "#d71920", secondary: "#131112", tertiary: "#d4af37", accentSoft: "#f1d58a" },
+  SRH: { primary: "#f26a21", secondary: "#7a2f00", tertiary: "#ffd447", accentSoft: "#ffe391" },
+  DC: { primary: "#0078d4", secondary: "#0e2a66", tertiary: "#e63946", accentSoft: "#ffb8bf" },
+  PBKS: { primary: "#c8102e", secondary: "#4a0912", tertiary: "#d4af37", accentSoft: "#f0d68e" },
+  RR: { primary: "#ff2f92", secondary: "#123d9a", tertiary: "#d4af37", accentSoft: "#f6dd98" },
+  GT: { primary: "#0b2344", secondary: "#111827", tertiary: "#caa65b", accentSoft: "#ecd8a0" },
+  LSG: { primary: "#a1186a", secondary: "#172b65", tertiary: "#d4af37", accentSoft: "#f3dd95" },
 };
 
 export default function FranchiseLoginArena({
@@ -42,14 +49,16 @@ export default function FranchiseLoginArena({
   onPasswordChange,
   onSubmit,
 }: FranchiseLoginArenaProps) {
-  const displayFranchise = selectedFranchiseDetails ?? FRANCHISES[0];
+  const displayFranchise = FRANCHISES.find((franchise) => franchise.code === selectedFranchise) ?? FRANCHISES[0];
   const selectedIndex = Math.max(
     0,
     FRANCHISES.findIndex((franchise) => franchise.code === displayFranchise.code),
   );
   const activeTheme = TEAM_THEME[displayFranchise.code];
   const arenaStyle = {
-    "--team-accent": activeTheme.accent,
+    "--team-primary": activeTheme.primary,
+    "--team-secondary": activeTheme.secondary,
+    "--team-accent": activeTheme.tertiary,
     "--team-accent-soft": activeTheme.accentSoft,
   } as CSSProperties;
 
@@ -62,7 +71,7 @@ export default function FranchiseLoginArena({
           </div>
           <div className={styles.profileBar}>
             <p>Franchise Profile</p>
-            <h1>Tata IPL Auction 2026</h1>
+            <h1>IPL Auction 2026</h1>
           </div>
           <Link href="/" className={styles.backButton}>
             Back
@@ -125,7 +134,7 @@ export default function FranchiseLoginArena({
             </p>
 
             <div className={styles.cityRibbon}>
-              <span>{selectedFranchiseDetails?.city ?? "Select Team"}</span>
+              <span>{displayFranchise.city}</span>
               <strong>Franchise Login</strong>
             </div>
 
@@ -136,14 +145,14 @@ export default function FranchiseLoginArena({
                 <span>Status</span>
               </div>
               <div className={styles.statusRow}>
-                <span>{selectedFranchiseDetails?.code ?? "--"}</span>
-                <span>{selectedFranchiseDetails?.city ?? "--"}</span>
-                <span>{selectedFranchiseDetails?.status ?? "Choose"}</span>
+                <span>{displayFranchise.code}</span>
+                <span>{displayFranchise.city}</span>
+                <span>{displayFranchise.status}</span>
               </div>
               <div className={styles.statusRow}>
                 <span>Login</span>
-                <span>{selectedFranchiseDetails ? "Open" : "--"}</span>
-                <span>{selectedFranchiseDetails ? "Ready" : "Waiting"}</span>
+                <span>{selectedFranchise ? "Open" : "--"}</span>
+                <span>{selectedFranchise ? "Ready" : "Waiting"}</span>
               </div>
             </div>
 

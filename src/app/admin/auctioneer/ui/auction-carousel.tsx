@@ -287,7 +287,7 @@ export default function AuctionCarousel({
         {/* Left part: Header text and Player Image card */}
         <div className="flex flex-col w-[360px] shrink-0 gap-6">
           <div className="pl-2">
-            <div className="text-xs font-black text-slate-400 tracking-[0.2em] uppercase mb-1 drop-shadow-sm">TATA IPL AUCTION 2026</div>
+            <div className="text-xs font-black text-slate-400 tracking-[0.2em] uppercase mb-1 drop-shadow-sm">IPL AUCTION 2026</div>
             <div className="text-4xl font-black uppercase tracking-tight text-white drop-shadow-md">Live Auction Card</div>
           </div>
 
