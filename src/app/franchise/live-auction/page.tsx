@@ -362,7 +362,7 @@ function FranchiseLiveAuctionContent() {
 
   if (!franchise) {
     return (
-      <main className="dashboard-shell">
+      <main className="dashboard-shell min-h-screen flex items-center justify-center">
         <section className="dashboard-card">
           <h1>Live Auction</h1>
           <p>Team is missing. Please login as a franchise first.</p>
@@ -377,10 +377,12 @@ function FranchiseLiveAuctionContent() {
   if (isLoading) {
     return (
       <main className="dashboard-shell h-screen overflow-hidden">
-        <section className="dashboard-card">
-          <h1>Loading Live Auction</h1>
-          <p>Fetching live player and auction state from Supabase.</p>
-        </section>
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <section className="dashboard-card">
+            <h1>Loading Live Auction</h1>
+            <p>Fetching live player and auction state from Supabase.</p>
+          </section>
+        </div>
       </main>
     );
   }
@@ -660,10 +662,12 @@ export default function FranchiseLiveAuctionPage() {
     <Suspense
       fallback={
         <main className="dashboard-shell h-screen overflow-hidden">
-          <section className="dashboard-card">
-            <h1>Loading Live Auction</h1>
-            <p>Connecting to live bidding feed.</p>
-          </section>
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <section className="dashboard-card">
+              <h1>Loading Live Auction</h1>
+              <p>Connecting to live bidding feed.</p>
+            </section>
+          </div>
         </main>
       }
     >

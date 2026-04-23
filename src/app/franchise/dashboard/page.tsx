@@ -755,7 +755,7 @@ function FranchiseDashboardContent() {
 
   if (!franchise) {
     return (
-      <main className="dashboard-shell">
+      <main className="dashboard-shell min-h-screen flex items-center justify-center">
         <section className="dashboard-card">
           <h1>Franchise Dashboard</h1>
           <p>Please login from the franchise screen to access your team dashboard.</p>
@@ -769,11 +769,13 @@ function FranchiseDashboardContent() {
 
   if (isLoading) {
     return (
-      <main className="dashboard-shell">
-        <section className="dashboard-card">
-          <h1>Loading {franchise.name}</h1>
-          <p>Fetching live squad and market data from Supabase.</p>
-        </section>
+      <main className="dashboard-shell min-h-screen">
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <section className="dashboard-card">
+            <h1>Loading {franchise.name}</h1>
+            <p>Fetching live squad and market data from Supabase.</p>
+          </section>
+        </div>
       </main>
     );
   }
@@ -807,11 +809,6 @@ function FranchiseDashboardContent() {
             marginBottom: "0"
           }}>
             <div className="flex items-center gap-4">
-              <img
-                src="/images/cricket-banner.png"
-                className="w-[70px] h-[50px] object-cover rounded-md"
-                alt="Cricket Tycoon"
-              />
               <span className="text-white/90 text-xl font-semibold tracking-wide drop-shadow-md">
                 Cricket Tycoon
               </span>
@@ -938,7 +935,7 @@ function FranchiseDashboardContent() {
                   {/* Title only */}
                   <p
                     className="text-xs font-bold uppercase tracking-widest"
-                    style={{ color: theme.accent }}
+                    style={{ color: "#ffffff" }}
                   >
                     Strategy Picks ({strategyPlayers.length}/2)
                   </p>
@@ -1154,11 +1151,13 @@ export default function FranchiseDashboardPage() {
   return (
     <Suspense
       fallback={
-        <main className="dashboard-shell">
-          <section className="dashboard-card">
-            <h1>Loading Franchise Dashboard</h1>
-            <p>Preparing live team data.</p>
-          </section>
+        <main className="dashboard-shell min-h-screen">
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <section className="dashboard-card">
+              <h1>Loading Franchise Dashboard</h1>
+              <p>Preparing live team data.</p>
+            </section>
+          </div>
         </main>
       }
     >
