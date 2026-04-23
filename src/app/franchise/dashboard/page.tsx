@@ -1,7 +1,7 @@
 'use client';
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { FRANCHISE_BY_CODE, type FranchiseCode } from "@/lib/franchises";
@@ -46,6 +46,12 @@ const isMissingTableError = (error: unknown): boolean => {
 };
 
 type ViewMode = "squad" | "market" | "strategy";
+
+type MarketBasePriceFilter = "all" | "upto50" | "50to100" | "above100";
+type MarketCreditsFilter = "all" | "upto50" | "51to70" | "above70";
+type MarketSortOption = "default" | "alphaAsc" | "alphaDesc" | "baseAsc" | "baseDesc" | "creditsAsc" | "creditsDesc";
+
+const MARKET_PAGE_SIZE = 12;
 
 const VIEW_LABELS: Record<ViewMode, string> = {
   squad: "Squad",
@@ -362,6 +368,12 @@ function FranchiseDashboardContent() {
   const [auctionState, setAuctionState] = useState<AuctionStateRow | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("squad");
   const [selectedStrategyIds, setSelectedStrategyIds] = useState<string[]>([]);
+  const [marketSearchQuery, setMarketSearchQuery] = useState("");
+  const deferredMarketSearchQuery = useDeferredValue(marketSearchQuery);
+  const [marketBasePriceFilter, setMarketBasePriceFilter] = useState<MarketBasePriceFilter>("all");
+  const [marketCreditsFilter, setMarketCreditsFilter] = useState<MarketCreditsFilter>("all");
+  const [marketSortOption, setMarketSortOption] = useState<MarketSortOption>("default");
+  const [marketPage, setMarketPage] = useState(1);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [roundTransitionModal, setRoundTransitionModal] = useState<RoundTransitionModal | null>(null);
@@ -384,6 +396,79 @@ function FranchiseDashboardContent() {
     [players],
   );
 
+  const filteredMarketPlayers = useMemo(() => {
+    const query = deferredMarketSearchQuery.trim().toLowerCase();
+
+    const baseFiltered = marketPlayers.filter((player) => {
+      const basePrice = player.basePriceLakhs ?? 0;
+      const credits = player.creditPoints ?? 0;
+      const matchesQuery =
+        !query ||
+        player.name.toLowerCase().includes(query) ||
+        (player.role ?? "").toLowerCase().includes(query) ||
+        (player.category ?? "").toLowerCase().includes(query) ||
+        String(player.slNo ?? "").includes(query);
+
+      const matchesBasePrice =
+        marketBasePriceFilter === "all" ||
+        (marketBasePriceFilter === "upto50" && basePrice <= 50) ||
+        (marketBasePriceFilter === "50to100" && basePrice > 50 && basePrice <= 100) ||
+        (marketBasePriceFilter === "above100" && basePrice > 100);
+
+      const matchesCredits =
+        marketCreditsFilter === "all" ||
+        (marketCreditsFilter === "upto50" && credits <= 50) ||
+        (marketCreditsFilter === "51to70" && credits >= 51 && credits <= 70) ||
+        (marketCreditsFilter === "above70" && credits > 70);
+
+      return matchesQuery && matchesBasePrice && matchesCredits;
+    });
+
+    if (marketSortOption === "default") {
+      return baseFiltered;
+    }
+
+    return [...baseFiltered].sort((leftPlayer, rightPlayer) => {
+      if (marketSortOption === "alphaAsc") {
+        return leftPlayer.name.localeCompare(rightPlayer.name);
+      }
+
+      if (marketSortOption === "alphaDesc") {
+        return rightPlayer.name.localeCompare(leftPlayer.name);
+      }
+
+      if (marketSortOption === "baseAsc") {
+        return (leftPlayer.basePriceLakhs ?? 0) - (rightPlayer.basePriceLakhs ?? 0);
+      }
+
+      if (marketSortOption === "baseDesc") {
+        return (rightPlayer.basePriceLakhs ?? 0) - (leftPlayer.basePriceLakhs ?? 0);
+      }
+
+      if (marketSortOption === "creditsAsc") {
+        return (leftPlayer.creditPoints ?? 0) - (rightPlayer.creditPoints ?? 0);
+      }
+
+      return (rightPlayer.creditPoints ?? 0) - (leftPlayer.creditPoints ?? 0);
+    });
+  }, [
+    deferredMarketSearchQuery,
+    marketBasePriceFilter,
+    marketCreditsFilter,
+    marketPlayers,
+    marketSortOption,
+  ]);
+
+  const marketTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredMarketPlayers.length / MARKET_PAGE_SIZE)),
+    [filteredMarketPlayers.length],
+  );
+
+  const paginatedMarketPlayers = useMemo(() => {
+    const startIndex = (marketPage - 1) * MARKET_PAGE_SIZE;
+    return filteredMarketPlayers.slice(startIndex, startIndex + MARKET_PAGE_SIZE);
+  }, [filteredMarketPlayers, marketPage]);
+
   const strategyPlayers = useMemo(
     () => squadPlayers.filter((player) => selectedStrategyIds.includes(player.id)),
     [selectedStrategyIds, squadPlayers],
@@ -398,6 +483,16 @@ function FranchiseDashboardContent() {
       document.body.classList.remove("smoke-page");
     };
   }, []);
+
+  useEffect(() => {
+    setMarketPage(1);
+  }, [deferredMarketSearchQuery, marketBasePriceFilter, marketCreditsFilter, marketSortOption]);
+
+  useEffect(() => {
+    if (marketPage > marketTotalPages) {
+      setMarketPage(marketTotalPages);
+    }
+  }, [marketPage, marketTotalPages]);
 
   useEffect(() => {
     if (!team) {
@@ -684,8 +779,19 @@ function FranchiseDashboardContent() {
   }
 
   /* ─── Render: active player list for the current view ─── */
-  const activePlayerList = viewMode === "squad" ? squadPlayers : viewMode === "market" ? marketPlayers : squadPlayers;
-  const emptyMessage = viewMode === "squad" ? "No squad players yet." : "All players are currently assigned.";
+  const activePlayerList =
+    viewMode === "squad"
+      ? squadPlayers
+      : viewMode === "market"
+        ? paginatedMarketPlayers
+        : squadPlayers;
+
+  const emptyMessage =
+    viewMode === "squad"
+      ? "No squad players yet."
+      : filteredMarketPlayers.length === 0
+        ? "No market players match your current search and filters."
+        : "All players are currently assigned.";
 
   return (
     <div className="relative w-full min-h-screen overflow-hidden max-w-full">
@@ -905,6 +1011,88 @@ function FranchiseDashboardContent() {
             {/* ── Player Cards Grid (squad/market views) ── */}
             {viewMode !== "strategy" ? (
               <div className="px-4 pt-3 pb-6 h-[calc(100vh-220px)] overflow-y-auto overflow-x-hidden scrollbar-hide" style={{ borderRadius: "0.5rem" }}>
+                {viewMode === "market" ? (
+                  <div className="mb-4 rounded-xl border border-white/15 bg-black/25 p-3">
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-[2fr_1fr_1fr_1fr]">
+                      <input
+                        type="text"
+                        value={marketSearchQuery}
+                        onChange={(event) => setMarketSearchQuery(event.target.value)}
+                        placeholder="Search name, role, category, or SL No"
+                        className="h-11 rounded-lg border border-white/20 bg-black/35 px-3 text-sm text-white placeholder:text-white/45 outline-none focus:border-white/40"
+                      />
+
+                      <select
+                        value={marketBasePriceFilter}
+                        onChange={(event) => setMarketBasePriceFilter(event.target.value as MarketBasePriceFilter)}
+                        className="h-11 rounded-lg border border-white/20 bg-black/35 px-3 text-sm text-white outline-none focus:border-white/40"
+                      >
+                        <option value="all">Base Price: All</option>
+                        <option value="upto50">Base Price: Up to 50L</option>
+                        <option value="50to100">Base Price: 50L to 1Cr</option>
+                        <option value="above100">Base Price: Above 1Cr</option>
+                      </select>
+
+                      <select
+                        value={marketCreditsFilter}
+                        onChange={(event) => setMarketCreditsFilter(event.target.value as MarketCreditsFilter)}
+                        className="h-11 rounded-lg border border-white/20 bg-black/35 px-3 text-sm text-white outline-none focus:border-white/40"
+                      >
+                        <option value="all">Credits: All</option>
+                        <option value="upto50">Credits: Up to 50</option>
+                        <option value="51to70">Credits: 51 to 70</option>
+                        <option value="above70">Credits: Above 70</option>
+                      </select>
+
+                      <select
+                        value={marketSortOption}
+                        onChange={(event) => setMarketSortOption(event.target.value as MarketSortOption)}
+                        className="h-11 rounded-lg border border-white/20 bg-black/35 px-3 text-sm text-white outline-none focus:border-white/40"
+                      >
+                        <option value="default">Sort: Default</option>
+                        <option value="alphaAsc">Sort: Alphabetical A-Z</option>
+                        <option value="alphaDesc">Sort: Alphabetical Z-A</option>
+                        <option value="baseAsc">Sort: Base Price Low-High</option>
+                        <option value="baseDesc">Sort: Base Price High-Low</option>
+                        <option value="creditsAsc">Sort: Credits Low-High</option>
+                        <option value="creditsDesc">Sort: Credits High-Low</option>
+                      </select>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-white/70">
+                      <p>
+                        {filteredMarketPlayers.length > 0
+                          ? `Showing ${(marketPage - 1) * MARKET_PAGE_SIZE + 1}-${Math.min(marketPage * MARKET_PAGE_SIZE, filteredMarketPlayers.length)} of ${filteredMarketPlayers.length}`
+                          : "Showing 0 of 0"}
+                        {" "}
+                        market players
+                      </p>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setMarketPage((currentPage) => Math.max(1, currentPage - 1))}
+                          disabled={marketPage === 1}
+                          className="rounded-md border border-white/20 px-3 py-1 text-white disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          Prev
+                        </button>
+                        <span className="min-w-20 text-center text-white/80">
+                          Page {marketPage} / {marketTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setMarketPage((currentPage) => Math.min(marketTotalPages, currentPage + 1))}
+                          disabled={marketPage >= marketTotalPages}
+                          className="rounded-md border border-white/20 px-3 py-1 text-white disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <section className="grid grid-cols-4 gap-6 overflow-visible" aria-label={
                   viewMode === "squad" ? "Team squad list" : "Auction market list"
                 }>
